@@ -1,0 +1,57 @@
+# Syntax rules for NiceShaper
+
+context default
+	keyword whole ceil red
+	keyword whole hold red
+	keyword whole lang red
+	keyword whole low red
+	keyword whole mode red
+	keyword whole rate red
+	keyword whole reload red
+	keyword whole set-mark red
+	keyword whole strict red
+
+	keyword whole mark-on-ifaces red
+	keyword whole local-subnets red
+	keyword whole run red
+	keyword whole fallback red
+	keyword whole debug red
+
+	keyword whole log red
+	keyword whole users red
+	keyword whole stats red
+	keyword whole status red
+	keyword whole listen red
+	keyword whole section red
+	keyword whole htb red
+	keyword whole sfq red
+	keyword whole esfq red
+	keyword whole iptables red
+	keyword whole alter red
+	keyword whole quota red
+	keyword whole auto-hosts red
+	keyword whole iface\-\[abcdefghijklmnopqrstuvwxyz0123456789+.:-\] red
+	keyword whole auto-hosts red
+
+	keyword whole host red
+	keyword whole class red
+	keyword whole class-virtual red
+	keyword whole class-wrapper red
+	keyword whole class-do-not-shape red
+	keyword whole match red
+	keyword whole include red
+	
+	keyword whole yes blue
+	keyword whole no blue
+	
+	keyword <# brown
+	keyword #> brown
+	keyword # brown
+
+context exclusive <# #> brown
+	spellcheck
+context exclusive # \n brown
+	spellcheck
+
+context linestart # \n brightred
+				

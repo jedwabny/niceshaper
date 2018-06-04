@@ -1,0 +1,141 @@
+html, body {
+	font-family: Arial, Verdana, Sans-Serif;
+	font-size: 12px;
+	margin: 0;
+	padding: 0px 10px;
+	text-align: left;
+	background-color: #FFFFFF;
+}
+
+a {
+	color: blue;
+	text-decoration: none;
+	font-weight: normal;
+}
+
+h1, h2, h3 {
+	color: black;
+	font-weight: bold;	
+}
+
+h1 {
+	text-align: center;
+	font-size: 16px;
+	margin: 8px 0;
+	padding: 4px 0;
+	border-width: thin 0;
+	border-style: solid;	
+}			
+
+h2 {
+	text-align: center;
+	font-size: 14px;
+	margin: 6px 0;
+	padding: 3px 0;
+	border-width: thin 0 thin 0;
+	border-style: solid;
+}
+	
+h3 {
+	text-align: left;
+	font-size: 12px;
+	margin: 0.4em 0;
+	padding: 0 0;
+	border-width: 0;
+	border-style: none;
+}
+
+p {  
+	margin: 0.5em 0;	
+}
+
+span.p1 {
+	color: black;	 
+	font-weight: bold;
+	margin-left: 0;    
+}
+
+span.lg { 
+	color: brown;
+	font-style: normal;
+	font-weight: normal;
+	font-weight: bold;
+}
+
+span.lm { 
+	color: red;
+	font-style: normal;
+	font-weight: bold;
+}
+
+span.ls { 
+	color: green;
+	font-style: italic;
+	font-weight: bold;
+}
+
+span.lv { 
+	color: blue;
+	font-style: italic;
+	font-weight: normal;
+}
+
+div.boxExplain, div.boxExample {
+	display: block;
+	border: 0;
+	margin: 0.5em 0;
+	padding: 0.5em;
+}
+
+div.boxExplain {
+	border-radius: 5px 5px 0px 0px;
+	-moz-border-radius: 5px 5px 0px 0px;
+	-webkit-border-radius: 5px 5px 0px 0px;
+	border: 1px dashed #1d2487;
+	background-color: #d0d9e9;
+
+}
+
+div.boxExample {
+	border-radius: 0px 0px 5px 5px;
+	-moz-border-radius: 0px 0px 5px 5px;
+	-webkit-border-radius: 0px 0px 5px 5px;
+	border: 1px dashed #1d2487;
+	background-color: #f2f7f2;
+
+}
+
+div.boxPure {
+	display: block;
+	border: 0;
+	margin: 0.5em 0;
+	padding: 0;
+	background-color: #ffffff;
+}
+
+div.boxExplain ul, div.boxExample ul, div.boxPure ul {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+}
+
+div.boxExplain ul.itemize, div.boxExample ul.itemize, div.boxPure ul.itemize {
+	list-style-type: disc;
+	margin: 0 2em;
+}
+
+div.boxExplain ul li, div.boxExample ul li, div.boxPure ul li {
+	margin: 0;
+	padding: 0;
+}
+
+div.boxExplain ul li.indent, div.boxExample ul li.indent, div.boxPure ul li.indent {
+	margin: 0 2em;
+}
+
+div.boxExplain ul li ul, div.boxExample ul li ul, div.boxPure ul li ul {
+	margin: 0 2em;
+	padding: 0;
+}
+
+

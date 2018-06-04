@@ -1,0 +1,282 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamic Traffic Shaper</title>
+	<meta http-equiv="Content-Language" content="en-GB">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Introduction</h1>
+
+Firstly, let's introduce the most important assumes. These assumes are about network interfaces and internet providers uplinks. These are the same as in documentation, with second internet uplink connected to eth2 interface.
+<p>
+So, to be completely informed. We have router with 3 interfaces. First uplink is connected to eth0 interface, LAN network is connected to eth1 interface, and second uplink is connected to eth2. Public address of first uplink is 198.51.100.100/24, public address of second uplink is 203.0.113.100/24, and LAN side address is 192.168.0.1/24. LAN network addressing is 192.168.0.0/24.
+<p>
+Both uplinks are asymmetric with 8000kb/s downstream rate, 500kb/s upstream rate and 10000kb/s downstream rate, 600kb/s upstream rate.
+<p>
+There are many ways to use load balancing on two uplinks. In this scenario we use first uplink as default and second for http and e-mail traffic only. Both http and e-mail don't generate static traffic. Thanks to that, it's excellent to share uplink throughput between many hosts. Also using as high as possible of both downstream and upstream is a goal.
+
+<h1>Routing</h1>
+
+Create script, e.g.: /usr/local/sbin/routing.sh, and make it executable. This script is for reloading configuration of routing, packets marking, NAT, and NiceShaper starting.
+<p>
+Let's execute command written below:
+
+<div class="boxExample">
+FILEPATH="/usr/local/sbin/routing.sh"<br>
+touch ${FILEPATH}<br>
+chown root:root ${FILEPATH}<br>
+chmod 750 ${FILEPATH}
+</div>
+
+This script should be executed automatically with OS starting. It's ease to achieve this by creating some init script or putting path to /etc/rc.local.
+<p>
+After executing this script, all of TCP packets with destination ports equal to one of these from isp2_ports_tcp will be marked with 0x2 value. Thanks to that, all of such packets will be routed by second uplink and NiceShaper will be able to recognize and control them by certain sections.
+<p>
+Below is script content to be pasted to your file. Remember to edit configuration section.
+
+<div class="boxExample">
+#!/bin/sh
+<p>
+# === Configuration ===
+<p>
+wan1_iface="eth0"<br>
+wan1_net="198.51.100.0/24"<br>
+wan1_ip="198.51.100.100"<br>
+wan1_gw="198.51.100.2"
+<p>
+lan_iface="eth1"<br>
+lan_net="192.168.0.0/24"
+<p>
+wan2_iface="eth2"<br>
+wan2_net="203.0.113.0/24"<br>
+wan2_ip="203.0.113.100"<br>
+wan2_gw="203.0.113.2"
+<p>
+isp2_ports_tcp="80,443,25,465,143,993,110,995"
+<p>
+# === Operating System preparation ===
+<p>
+IP=`which ip`<br>
+IPT=`which iptables`<br>
+NS=`which niceshaper`<br>
+ECHO=`which echo`
+<p>
+if [ -z "$IP" ]; then<br>
+		echo "Missing ip binary (iproute)"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$IPT" ]; then<br>
+		echo "Missing iptables binary"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$NS" ]; then<br>
+		echo "Missing niceshaper binary"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$ECHO" ]; then<br>
+		echo "Missing echo binary"<br>
+		exit 255<br>
+fi
+<p>
+$ECHO 1 &gt; /proc/sys/net/ipv4/ip_forward<br>
+$ECHO 0 &gt; /proc/sys/net/ipv4/conf/all/rp_filter
+<p>
+# === NiceShaper ===
+<p>
+$ECHO "Stopping NiceShaper"
+<p>
+$NS stop
+<p>
+# === Routing ===
+<p>
+$ECHO "Routing - Cleaning"
+<p>
+$IP route flush table 241 2&gt;/dev/null<br>
+$IP route flush table 242 2&gt;/dev/null<br>
+$IP rule del fwmark 0x1 table 241 2&gt;/dev/null<br>
+$IP rule del fwmark 0x2 table 242 2&gt;/dev/null<br>
+<p>
+$ECHO "Routing - Table 241"
+<p>
+$IP route add ${wan1_net} dev ${wan1_iface} table 241 # Local route<br>
+$IP route add ${wan2_net} dev ${wan2_iface} table 241 # Local route<br>
+$IP route add ${lan_net} dev ${lan_iface} table 241 # Local route<br>
+$IP route add default via ${wan1_gw} table 241 # Default route through the uplink #1.
+<p>
+$ECHO "Routing - Table 242"
+<p>
+$IP route add ${wan1_net} dev ${wan1_iface} table 242 # Local route<br>
+$IP route add ${wan2_net} dev ${wan2_iface} table 242 # Local route<br>
+$IP route add ${lan_net} dev ${lan_iface} table 242 # Local route<br>
+$IP route add default via ${wan2_gw} table 242 # Default route through the uplink #2
+<p>
+$ECHO "Routing - Rules"
+<p>
+$IP rule add fwmark 0x1 table 241<br>
+$IP rule add fwmark 0x2 table 242
+<p>
+# === Packets marking ===
+<p>
+$ECHO "Creating iptables filters - packets marking"
+<p>
+$IPT -t mangle -F PREROUTING 2&gt;/dev/null<br>
+<p>
+$IPT -t mangle -F routemark 2&gt;/dev/null<br>
+$IPT -t mangle -X routemark 2&gt;/dev/null<br>
+$IPT -t mangle -N routemark
+<p>
+$IPT -t mangle -A routemark -i ${wan1_iface} -j MARK --set-mark 0x1<br>
+$IPT -t mangle -A routemark -i ${wan2_iface} -j MARK --set-mark 0x2
+<p>
+$IPT -t mangle -A routemark -i ${lan_iface} -p tcp -m multiport --dports ${isp2_ports_tcp} -j MARK --set-mark 0x2<br>
+<p>
+$IPT -t mangle -A routemark -i ${lan_iface} -m mark ! --mark 0x2 -j MARK --set-mark 0x1
+<p>
+$IPT -t mangle -A routemark -j CONNMARK --save-mark
+<p>
+$IPT -t mangle -A PREROUTING -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark<br>
+$IPT -t mangle -A PREROUTING -m state --state NEW -j routemark
+<p>
+# === NAT ===
+<p>
+$ECHO "Creating iptables filters - NAT" 
+<p>
+$IPT -t nat -F POSTROUTING<br>
+$IPT -t nat -A POSTROUTING -o ${wan1_iface} -s ${lan_net} -j SNAT --to ${wan1_ip}<br>
+$IPT -t nat -A POSTROUTING -o ${wan2_iface} -s ${lan_net} -j SNAT --to ${wan2_ip}
+<p>
+# === NiceShaper ===
+<p>
+$ECHO "Starting NiceShaper"
+<p>
+$NS start
+<p>
+</div>
+
+<h2>NiceShaper configuration</h2>
+
+Minimal content of config.conf file:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;global&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">run</span> <span class="lv">dl1 ul1 dl2 ul2</span></li>
+		<li><span class="lm">mark-on-ifaces</span> <span class="lv">eth0 eth1 eth2</span></li>
+		<li><span class="lm">local-subnets</span> <span class="lv">192.168.0.0/24</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;dl1&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">8000kb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">7200kb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+		<li><span class="lm">reload</span> <span class="lv">3s</span></li>
+		<li><span class="lm">low</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">4000kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul1&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">500kb/s</span> 
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">450kb/s</span>
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+		<li><span class="lm">reload</span> <span class="lv">1s</span></li>
+		<li><span class="lm">low</span> <span class="lv">64kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;dl2&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">10000kb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">9000kb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+		<li><span class="lm">reload</span> <span class="lv">3s</span></li>
+		<li><span class="lm">low</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">5000kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul2&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">600kb/s</span> 
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">550kb/s</span>
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+		<li><span class="lm">reload</span> <span class="lv">1s</span></li>
+		<li><span class="lm">low</span> <span class="lv">64kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+</div>
+
+If we are talking about scenario with single uplink and NAT, we need packets marking on outgoing interface only. But in multiple uplinks scenarios we need packets marking on all of the interfaces. It's important to figure out by which uplink the packet reach the network.
+
+<h3>Example classes</h3>
+
+This is a complete set of classes for single host.
+
+<div class="boxExample">
+<ul class="example">
+	<li><span class="lm">class</span> <span class="lv">dl1 eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">mark</span> <span class="lv">0x1</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl2 eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">mark</span> <span class="lv">0x2</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul1 eth0 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul2 eth2 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+</div>
+
+First two classes are responsible for download. Filters classify packets based on destination address and virtual mark value. This mark value changes depending on source uplink.
+<p>
+Last two classes are responsible for upload. Filters classify packets based on source address and outgoing interface. This interface changes depending on routing.
+<p>
+To summarize how to distinguish by which uplink the packets are routed. In the case of download, we use packet mark value, as outgoing interface is always the same (it's the LAN interface). In the case of upload, it's proper and comfortable to use outgoing interface. In this case, we don't need to explicitly indicate interface as it is the class interface.
+<p>
+Now, you should proceed to duplicate this set of classes for each host in network.
+<p>
+To simplify and compact the classes file, it's useful to use macro. The proposed one here is foreach-pair macro, which generates a copy of this set of classes for each defined "name - last IP octed" pair.
+
+<div class="boxExample">
+<ul class="example">
+<li><span class="lg">{foreach-pair pc10 10, pc11 11, pc12 12}</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl1 eth1 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span> <span class="ls">mark</span> <span class="lv">0x1</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl2 eth1 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span> <span class="ls">mark</span> <span class="lv">0x2</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul1 eth0 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul2 eth2 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lg">{/}</span></li>
+</ul>
+</div>
+
+</body>
+</html>
+

@@ -1,0 +1,896 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamiczny podział łącza</title>
+	<meta http-equiv="Content-Language" content="pl">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Spis treści</h1>
+
+<div class="boxPure">
+<ul>
+	<li><a href="#part100">Wstęp i wymagania</a></li>
+	<li><a href="#part200">Instalacja</a></li>
+	<li><a href="#part300">Konfiguracja</a></li>
+	<li>
+	<ul>
+		<li><a href="#part302">Składnia plików konfiguracyjnych</a></li>
+		<li><a href="#part303">Główny plik konfiguracyjny, na przykładzie</a></li>
+		<li><a href="#part304">Hosty i klasy NiceShapera</a></li>
+		<li><a href="#part305">Makra pliku klas</a></li>
+		<li><a href="#part306">Obsługa markowania pakietów</a></li>
+		<li><a href="#part307">Obsługa interfejsów IMQ</a></li>
+		<li><a href="#part308">Wyzwalacze</a></li>
+		<li><a href="#part309">Jak traktować ruch z i do routera</a></li>
+	</ul>
+	</li>
+	<li><a href="#part400">Tematy zaawansowane</a></li>
+	<li>
+	<ul>
+		<li><a href="#part401">Współpraca z iptables</a></li>
+		<li><a href="#part402">Współpraca z HTB</a></li>
+		<li><a href="#part403">Klasy typu virtual</a></li>
+	</ul>
+	</li>
+</li>
+</ul>
+</div>
+
+<h1 id="part100">Wstęp i wymagania</h1>
+
+Celem działania NiceShapera jest umożliwienie optymalnego wykorzystania łącza internetowego oraz uproszczenie konfiguracji, złożonego zagadnienia jakim jest kształtowanie ruchu sieciowego w Linuksie. Projektując rozwiązania staram się by były one elastyczne, intuicyjne i przejrzyste, by upraszczały to co niepotrzebnie skomplikowane, ale też udostępniały możliwość konfigurowania tego, nad czym warto mieć kontrolę.
+<p>
+Możliwe jest wstępne stworzenie dobrze działającego podziału łącza, bez zapoznania się z tą dokumentacją, używając dołączonych przykładowych plików konfiguracyjnych, pod warunkiem posiadania w miarę solidnych podstaw z zakresu działania sieci. Należy mieć jednak świadomość, że po przyjrzeniu się dołączonym przykładowym plikom konfiguracyjnym i pierwszym udanym uruchomieniu NiceShapera, warto zapoznać się z niniejszą dokumentacją by lepiej poznać dostępne funkcjonalności programu. NiceShaper bardzo się stara, ale nie jest w stanie odgadnąć wszystkich Twoich intencji, dlatego wiedza z zakresu sieci oraz systemu Linux jest ważna. Nie należy się jednak zrażać czytając dokumentację, gdyż wykracza ona poza minimum potrzebne do uruchomienia podstawowego podziału łącza. W końcu NiceShaper ma ułatwiać to co w HTB trudne, ale jednocześnie dostarczać dodatkowych możliwości.
+<p>
+W minimalnej konfiguracji niezbędny jest router z systemem Linux z programem iptables i wkompilowanymi w kernel: kolejką HTB, algorytmem kolejkowania SFQ oraz filtrem kernela U32.
+<p>
+W dalszej części dokumentacji klasy HTB nazywane będą właśnie kolejkami HTB, tak by nie były one mylone z klasami NiceShapera. SFQ i inne bezklasowe dyscypliny kolejkowania to algorytmy kolejkowania. Filtry U32 i FW to filtry kernela, by nie były mylone z filtrami NiceShapera.
+<p>
+W najpopularniejszych dystrybucjach Linuksa HTB, SFQ oraz filtry U32 i FW są domyślnie wkompilowane w kernel lub dostarczane w formie modułów. Program iptables, pomijając obsługę IMQ, podobnie.
+<p>
+Na potrzeby dokumentacji, przyjmujemy, że posiadamy router z dwoma interfejsami. Łącze internetowe podłączone jest do interfejsu eth0, sieć lokalna do eth1. Adres publiczny routera to 198.51.100.100, prywatny 192.168.0.1 a adresacja sieci lokalnej to 192.168.0.0/24. 
+<p>
+Pomijając ograniczony ingress qdisc, którego NiceShaper nie używa, kształtowanie ruchu odbywa się na interfejsie, którym, kontrolowany ruch opuszcza router. Zatem, dla powyższych założeń, kształtowanie downloadu klientów odbywać się będzie na interfejsie eth1, gdyż pakiet z internetu wchodzi do routera interfejsem eth0 i po przeforwardowaniu, skierowany do klienta, opuszcza go właśnie interfejsem eth1. Odwrotna sytuacja zachodzi dla uploadu. Pakiet transmitowany przez klienta, wchodzi do routera przez interfejs eth1, by po przeforwardowaniu opuścić go interfejsem eth0. Zatem kształtowanie uploadu powinno się odbywać na interfejsie eth0. Należy bezwzględnie pamiętać, że ten akapit jest prawidłowy wyłącznie dla powyższych założeń i może być wymagane, dopasowanie konfiguracji, przed uruchomieniem w odmiennym środowisku!
+<p>
+Dobór interfejsów będzie kluczowy do zdefiniowania klas NiceShapera oraz dla części z dyrektyw konfiguracyjnych operujących na interfejsach. Przykładowo jeśli sieć LAN znajduje się za NATem i chcemy obsłużyć upload metodą markowania pakietów, mechanizm ten należało by włączyć na interfejsie eth0 (dyrektywa mark-on-ifaces eth0)
+<p>
+Nawiasem mówiąc, wspomniana kontrola pasma wychodzącego z sieci ukrytej za NATem, poza markowaniem pakietów, możliwa jest do zrealizowana za pomocą interfejsów IMQ. Ponadto interfejsy IMQ mogą zostać wykorzystane, do kontroli pasma przychodzącego routera. Obydwa mechanizmy zostały opisane w dalszej części dokumentacji.
+<p>
+Przypominam, wskazane interfejsy są poprawne dla poczynionych założeń a nie dla każdego routera!
+<p>
+Na koniec akapit o oznaczaniu interfejsów sieciowych. Iptables i Iproute nie rozróżniają aliasów interfejsów, które nawiasem mówiąc, są przestarzałym rozwiązaniem z czasów powszechnego stosowania polecenia ifconfig. Polecenie ifconfig zostało z powodzeniem zastąpione przez polecenie ip. Stąd w przypadku takich interfejsów z aliasami, w konfiguracji NiceShapera pomijamy część aliasową czyli dwukropek i liczbę za nim. Natomiast VLANy zapisywane w formie ethX.vid, są w pełni obsługiwane.
+<p>
+Uzupełniając temat obsługi VLANów w Linuksie. Jeśli podnoszony jest sub interfejs tagowany i uruchomione na nim zostaje kształtowanie ruchu, warto całkowicie zrezygnować z przypisywania adresu i podnoszenia interfejsu nietagowanego. W przeciwnym wypadku może się okazać, że kernel podda tagowane pakiety dwukrotnemu kolejkowaniu. Raz na tagowanym sub interfejsie oraz kolejny raz na fizycznym.
+<p>
+NiceShaper bardzo dobrze skaluje się, na routerach obsługujących do około pięciuset hostów - choć pojawiają się doniesienia o bezproblemowej pracy w większych sieciach. W takich sieciach niezbędne okazują się być tablice mieszające, których użycie w NiceShaperze, ze względu na zbyt małą elastyczność, nie jest aktualnie planowane. 
+
+<h1 id="part200">Instalacja</h1>
+
+Opis dotyczy instalacji z pakietu źródłowego. Do jej przeprowadzenia niezbędny jest kompilator c++ z pakietu gcc, biblioteki standardowe c i c++ oraz program make. Rozpakowany pakiet kompiluje się z pominięciem ./configure, gdyż NiceShaper jest nieprzenośny - działa wyłącznie pod Linuksem.
+<p>
+Procedura kompilacji i instalacji:
+
+<div class="boxExample">
+$ bunzip2 niceshaper-%{wersja}.tar.bz2<br>
+$ tar xf niceshaper-%{wersja}.tar<br>
+$ cd niceshaper-%{wersja}<br>
+$ make<br>
+$ su<br>
+# make install
+</div>
+
+Polecenie make install skopiuje skompilowany program do katalogu /usr/local/bin. Ścieżka może zostać zmieniona za pomocą zmiennej środowiskowej BINDIR. Automatycznie utworzone zostaną wymagane katalogi: /etc/niceshaper, /var/lib/niceshaper oraz /usr/share/doc/niceshaper. Przykładowe pliki konfiguracyjne zostaną skopiowane do katalogu /etc/niceshaper. Jeśli pliki konfiguracyjne już istnieją nie zostaną one nadpisane lecz pliki w nowych wersjach zostaną skopiowane z postfixem "-dist". Dokumentacja oraz pozostała zawartość pakietu zostanie skopiowana do katalogu /usr/share/doc/niceshaper.
+
+<h1 id="part300">Konfiguracja</h1>
+
+<h2 id="part302">Składnia plików konfiguracyjnych</h2>
+	
+Wymagane podstawowe pliki konfiguracji to /etc/niceshaper/config.conf oraz /etc/niceshaper/class.conf.
+
+<div class="boxExplain">
+	<span class="lm">include</span> <span class="ls">file</span> <span class="lv"><i>ścieżka</i></span> - Dyrektywa include użyta w tych plikach pozwala włączać kolejne. Dyrektywa include obsługuje ścieżki absolutne (z rozpoczynającym znakiem slash) oraz relatywne do katalogu konfiguracyjnego (domyślnie /etc/niceshaper).
+</div>
+
+Sama konfiguracja składa się z dyrektyw i parametrów, których kolejność nie jest istotna a składnia to:
+
+<div class="boxExplain">
+	<span class="lm">parametr</span> <span class="lv">wartość</span> [<span class="lv">wartość</span>] - Czyli parametr z przypisaną mu jedną lub listą, rozdzielonych białymi znakami, wartości, np.:
+</div>
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">ceil</span> <span class="lv">5Mb/s</span></li>
+	<li><span class="lm">run</span> <span class="lv">dl ul</span></li>
+</ul>
+</div>
+
+<div class="boxExplain">
+	<span class="lm">dyrektywa</span> <span class="ls">parametr</span> <span class="lv">wartość</span> [<span class="ls">parametr</span> <span class="lv">wartość</span>] - Czyli dyrektywa z listą parametrów i wartości, wymienionych parami, np.:
+</div>
+
+<div class="boxExample">
+	<span class="lm">section</span> <span class="ls">speed</span> <span class="lv">20Mb/s</span> <span class="ls">shape</span> <span class="lv">19Mb/s</span>
+</div>
+
+Parser konfiguracji automatycznie rozbija podane wartości lub pary parametrów z wartościami. Stąd w ramach własnych preferencji, powyższe przykłady, można również zapisać następująco:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">ceil</span> <span class="lv">5Mb/s</span></li>
+	<li><span class="lm">run</span> <span class="lv">dl</span></li>
+	<li><span class="lm">run</span> <span class="lv">ul</span></li>
+	<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">20Mb/s</span></li>
+	<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">19Mb/s</span></li>
+</ul>
+</div>
+
+Wyjątkami od powyższych zasad są dyrektywy: host, class, match, nagłówki sekcji oraz nagłówki makr. Ich składnia opisana jest w dalszej części konfiguracji.
+<p>
+Poza różnicami składniowymi dyrektywy dzielą się, ze względu na zasięg funkcjonowania, na: dyrektywy sekcji global, dyrektywy sekcji funkcjonalnych oraz dyrektywy klas. Jeśli chodzi o dyrektywy klas, wszystkie poza nagłówkiem oraz filtrem mogą zostać umieszczone w konfiguracjach sekcji funkcjonalnych, w efekcie dostarczając wartości domyślnych dla wszystkich klas wchodzących w skład takiej sekcji.
+<p>
+Podstawowe jednostki przepustowości to b/s (bit na sekundę), oraz B/s (bajt na sekundę). Poprawne przedrostki to k (kilo) oraz M (Mega). Dopisek '/s' nie jest obowiązkowy a rozróżnienie między przepustowością a ilością przesłanych danych odbywa się na podstawie kontekstu. Jednostką domyślną przepustowości jest b/s (bit na sekundę).
+<p>
+NiceShaper udostępnia kilka znaków specjalnych. Znak "#" jest komentarzem i odnosi się do reszty linii występującej za nim. Znaki "&lt;# komentarz #&gt;" również tworzą komentarz, z tą różnicą że stosuje się je w parze a obejmują dowolny wycinek linii konfiguracyjnej. Oczywiście zakomentowana część konfiguracji nie jest brana pod uwagę. Kolejny znak specjalny, znak średnika, zastępuje przejście do nowej linii konfiguracji, pozwala zminimalizować długość pliku konfiguracyjnego klas, czasem pozytywnie a czasem negatywnie wpływa na czytelność.
+<p>
+Każda zmiana konfiguracji wymagają zrestartowania programu.
+<p>
+Wszystkie konfiguracje dostarczone z pakietem są tylko przykładami i nie są optymalne dla każdej sieci - choć są dobrym materiałem wyjściowym do poznania programu.
+
+<h2 id="part303">Główny plik konfiguracyjny, na przykładzie</h2>
+
+Domyślnie głównym plikiem konfiguracyjnym jest plik /etc/niceshaper/config.conf. Jest on podzielony na sekcje. Do prawidłowego działania niezbędna jest, zawierająca główną konfiguracje programu, sekcja o nazwie global. Dodatkowo minimum jedna a w praktyce dwie, lub nawet więcej, sekcje funkcjonalne. Sekcja funkcjonalna, z reguły, odzwierciedla jeden z kierunków przepływu ruchu przez łącze internetowe, podłączone do obsługiwanego routera. Podsumowując, każde łącze obsługiwane jest przez minimum dwie sekcje funkcjonalne. Każda sekcja dysponuje własną konfiguracją, listą klas NiceShapera oraz parametrami domyślnymi dla tych klas. W skład sekcji wchodzić mogą klasy pracujące na różnych interfejsach, a na każdym interfejsie pracować mogą, klasy wchodzące w skład różnych sekcji (o ile obsługują ten sam kierunek ruchu).
+<p>
+Przykładowa zawartość głównego pliku konfiguracyjnego:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;global&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">run</span> <span class="lv">dl ul</span></li>
+		<li><span class="lm">mark-on-ifaces</span> <span class="lv">eth0</span></li>
+		<li><span class="lm">local-subnets</span> <span class="lv">192.168.0.0/24</span></li>
+		<li><span class="lm">auto-hosts</span> <span class="ls">dl</span> <span class="lv">eth1</span> <span class="ls">ul</span> <span class="lv">eth0</span></li>
+		<li><span class="lm">status</span> <span class="ls">unit</span> <span class="lv">kb/s</span></li>
+		<li><span class="lm">status</span> <span class="ls">file</span> <span class="lv">/var/www/niceshaper/status.txt</span></li>
+		<li><span class="lm">status</span> <span class="ls">file-owner</span> <span class="lv">root</span> <span class="ls">file-group</span> <span class="lv">root</span> <span class="ls">file-mode</span> <span class="lv">644</span></li>
+		<li><span class="lm">log</span> <span class="ls">syslog</span> <span class="lv">yes</span></li>
+		<li><span class="lm">log</span> <span class="ls">terminal</span> <span class="lv">yes</span></li>
+		<li><span class="lm">log</span> <span class="ls">file</span> <span class="lv">no</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;dl&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">20Mb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">18Mb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+		<li><span class="lm">reload</span> <span class="lv">2s</span></li>
+		<li><span class="lm">low</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">5Mb/s</span></li>
+		<li><span class="lm">strict</span> <span class="lv">70</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">2Mb/s</span> <span class="ls">shape</span> <span class="lv">1800kb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+		<li><span class="lm">reload</span> <span class="lv">1s</span></li>
+		<li><span class="lm">low</span> <span class="lv">64kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">strict</span> <span class="lv">70</span></li>
+	</ul>
+	</li>
+</ul>
+</div>
+
+<h3>Dyrektywy i parametry sekcji global:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="lm">run</span> - Lista sekcji na potrzeby których uruchomione zostaną instancje NiceShapera.</li>
+	<li><span class="lm">mark-on-ifaces</span> - Lista interfejsów na których włączona zostanie funkcjonalność markowania pakietów. Co w zakresie iptables oznacza wprowadzenie reguł do tabeli mangle a w miejsce filtrów kernela U32 użyte zostaną filtry FW. Opcja ta jest niezbędna by kontrolować upload hostów z adresacją prywatną poddawanych maskowaniu na adres publiczny routera lub korzystać z możliwości filtrowania które posiada iptables, lecz już filtr U32 nie.</li>
+	<li><span class="lm">local-subnets</span> - Lista sieci lokalnych podłączonych bezpośrednio do interfejsów routera. W przestrzeni iptables wszystkie pakiety kierowane do wskazanych podsieci, trafiają do łańcucha ns_dwload a pakiety wychodzące z nich do łańcucha ns_upload. </li>
+	<li><span class="lm">lang</span> <span class="lv">en|pl</span> - Określa język komunikatów. Domyślnie definiowany przez zmienną środowiskową LANG. Aktualnie poza domyślnym językiem angielskim, obsługiwana jest wartość pl_PL.UTF-8 tej zmiennej.</li>
+	<li><span class="lm">auto-hosts</span> <span class="ls">sekcja</span> <span class="lv">interfejs</span> [<span class="ls">sekcja</span> <span class="lv">interfejs</span>] - Oczekiwane są pary składające się z sekcji funkcjonalnych oraz interfejsów sieciowych. Ta dyrektywa może wydać się zawiła, łatwiej można ją zrozumieć analizując plik class.conf. Dzięki funkcjonalności auto-hosts można bardzo łatwo i szybko uruchomić podział łącza, używając dyrektywy host w pliku class.conf, po prostu definiując listę hostów w sieci lokalnej, używając ich adresów IP oraz przyporządkowując im wybrane nazwy. Dyrektywa auto-hosts wskazuje sekcje funkcjonalne, które mają zawierać, automatycznie utworzone w miejsce dyrektywy host klasy, oraz wskazuje interfejsy na których te klasy będą umieszczone.</li>
+	<li><span class="lm">iface-&lt;dev&gt;</span> <span class="ls">{speed|do-not-shape-method|unclassified-method|fallback-rate|mode}</span> - Konfiguracja interfejsów sieciowych. Nazwa dyrektywy zawiera w sobie nazwę interfejsu (z pominięciem oznaczenia aliasu) np. iface-eth0, iface-imq1 itp.</li>
+	<li>
+	<ul>
+		<li><span class="ls">speed</span> - Określa fizyczną przepustowość wychodzącą interfejsu, np. dla ethernetu będzie to 100Mb/s czy 1000Mb/s. Parametr ten jest wymagany, dla wszystkich interfejsów na których zdefiniowano klasy typu wrapper albo do-not-shape z parametrem interfejsu do-not-shape-method safe.</li>
+		<li><span class="ls">do-not-shape-method</span> <span class="lv">safe|full-throttle</span> - Konfiguracja sposobu kolejkowania klas typu do-not-shape na interfejsie. Domyślnie: safe.</li>
+		<li>
+		<ul>
+				<li><span class="lv">safe</span> - Filtry kernela klas typu do-not-shape przekazują ruch do wspólnej nadrzędnej kolejki HTB, opisanej we wstępie do współpracy NiceShapera z HTB. Takie rozwiązanie nie zapewnia przesyłania pakietów pomiędzy routerem a siecią lokalną z pełną prędkością interfejsu, lecz w pewnym stopniu chroni ruch obsługiwany przez standardowe klasy.</li>
+				<li><span class="lv">full-throttle</span> - Ruch z klas typu do-not-shape nie będzie kierowany do wspomnianej kolejki HTB, opuści on interfejs z pełną prędkością bez kolejkowania. Należy mieć na uwadze że tym sposobem można spowodować pełne wysycenie możliwości interfejsu sieciowego przez klasy typu do-not-shape. W efekcie uniemożliwiając sprawne kolejkowanie ruchu obsługiwanego przez klasy standardowe. Wartość full-throttle nie jest zalecana.</li>
+		</ul>
+		</li>
+		<li><span class="ls">unclassified-method</span> <span class="lv">fallback-class|do-not-control</span> - Wybór sposobu obsługi niesklasyfikowanego przez utworzone filtry ruchu. Domyślnie: fallback-class. UWAGA: Niekontrolowany ruch nigdy nie powinien się na żadnym z kontrolowanych interfejsów pojawić, wszystko co opuszcza interfejs musi posiadać pasujący filtr.</li>
+		<li>
+		<ul>
+				<li><span class="lv">fallback-class</span> - Niesklasyfikowany przez filtry ruch zostaje przesłany do kolejki awaryjnej, gdzie następuje jego zdławienie, by w jak najmniejszym stopniu wpływał na wykorzystanie pasma internetowego.</li>
+				<li><span class="lv">do-not-control</span> - Przywraca zachowanie z wersji 1.0pre3 i wcześniejszych, czyli pakiety niesklasyfikowane opuszczające interfejs nie są kontrolowane. Jest to wysoce niepożądane zachowanie, jednak opcja istnieje dla wygody osób przyzwyczajonych do tamtego nieprzemyślanego sposobu działania.</li>
+		</ul>
+		</li>
+		<li><span class="ls">fallback-rate</span> - Pasmo przyporządkowane kolejce awaryjnej która obsługiwać będzie pakiety wychodzące interfejsem, które nie zostały sklasyfikowane do żadnej klasy na nim występującej. To nic innego jak kolejka HTB wskazana jako domyślna. By podział łącza mógł działać poprawnie do tej kolejki nie powinno nigdy nic wpadać. Domyślnie: 100kb/s.</li>
+		<li><span class="ls">mode</span> <span class="lv">download|upload</span> - Klasy typów wrapper oraz do-not-shape, jeśli występują samodzielnie na interfejsie (to znaczy, bez towarzystwa klas standardowych), wymagają wskazania kierunku przepływu kontrolowanego na tym interfejsie ruchu.</li>
+	</ul>
+	</li>
+	<li><span class="lm">status</span> <span class="ls">{unit|classes|sum|do-not-shape|file|file-owner|file-group|file-mode|file-rewrite}</span> - Wyświetlanie statystyk pracy. 4 ostatnie parametry mają zastosowanie tylko jeśli automatyczny zrzut został uruchomiony.</li>
+	<li>
+	<ul>
+		<li><span class="ls">unit</span> - Wyświetlane jednostki przepustowości. Domyślnie: kb/s.</li>
+		<li><span class="ls">classes</span> <span class="lv">all|active|working|no</span> - Klasy wyświetlane w statystykach. Domyślnie: working.</li>
+		<li>
+		<ul>
+		<li><span class="lv">all</span> - Wyświetla wszystkie skonfigurowane klasy.</li>
+			<li><span class="lv">active</span> - Wyświetla klasy które wykazały aktywność.</li>
+			<li><span class="lv">working</span> - Wyświetla klasy które wykazały ostatnią aktywność w czasie krótszym od ustawienia parametru hold.</li>
+		</ul>
+		</li>
+		<li><span class="ls">sum</span> <span class="lv">top|bottom|no</span> - Miejsce wyświetlania podsumowania obciążenia sekcji.</li>
+		<li><span class="ls">do-not-shape</span> <span class="lv">yes|no</span> - Włącza wyświetlanie klas typu do-not-shape. Uwaga: Ta opcja załącza wykorzystywanie iptables, tzn. załadowanie reguł dla wszystkich klas w sekcjach zawierających klasy typu do-not-shape oraz w innych sekcjach o tym samym mode. Domyślnie: no.</li>
+		<li><span class="ls">file</span> <span class="lv">plik|no</span> - Włącza funkcjonalność automatycznego zrzucania statystyk do wskazanego pełną ścieżką pliku. Domyślnie: no.</li>
+		<li><span class="ls">file-owner</span> - Ustawia systemowego właściciela pliku. Domyślnie: root.</li>
+		<li><span class="ls">file-group</span> - Ustawia systemową grupę do której należy plik. Domyślnie: root.</li>
+		<li><span class="ls">file-mode</span> - Ustawia uprawnienia do pliku w trybie numerycznym. Domyślnie: 644. .</li>
+		<li><span class="ls">file-rewrite</span> - Ustawia częstotliwość automatycznego zrzucania statystyk do pliku w sekundach. Przyjmuje wartości od 1s do 3600s. Wraz z obniżaniem wartości tego parametru zwiększa się częstotliwość generowanych operacji dyskowych. Domyślnie: 30s.</li>
+	</ul>
+	</li>
+	<li><span class="lm">listen</span> <span class="ls">{address|password}</span> - Proces NiceShapera, działający w tle, jeśli wykonano komendę niceshaper status lub niceshaper show, odsyła żądane dane za pomocą protokołu TCP/IP. Dzięki tej dyrektywie możliwe jest uruchomienie opcji połączenia zdalnego, umożliwiając, np. zdalny odczyt statystyk pracy (chociażby ze stacji roboczej Administratora).</li>
+	<li>
+	<ul>
+		<li><span class="ls">address</span> <span class="lv">ip[:port]</span> - Ze względów bezpieczeństwa proces NiceShapera nasłuchuje domyślnie na adresie 127.0.0.1 i porcie 6423/TCP, więc nie daje, możliwości nawiązania połączenia z poza maszyny lokalnej. Parametr przełącza nasłuchiwanie na wskazany lokalny adres IP i opcjonalnie niestandardowy port, umożliwiając, zdalne połączenie się z pracującym procesem. Połączenie takie nawiązuje niceshaper uruchomiony z komendą status lub show i parametrem --remote.</li>
+		<li><span class="ls">password</span> - Domyślne hasło dostępu jest losowe. Uruchomiony lokalnie niceshaper status lub niceshaper show omija, potrzebę wpisywania danych dostępowych, odczytując obowiązujące hasło wraz adresem ip i portem z pliku /var/lib/niceshaper/supervisor.info. Jeśli planowane jest, udostępnienie funkcjonalności połączeń zdalnych z działającym procesem, ustawić należy własne hasło. Zaś by połączyć się ze zdalnego hosta z procesem NiceShapera, z użyciem ustawionego hasła, należy je wskazać za pomocą parametru uruchomieniowego --password.</li>
+	</ul>
+	</li>
+	<li><span class="lm">log</span> <span class="ls">{syslog|terminal|file}</span> - Metody logowania komunikatów.</li>
+	<li>
+	<ul>
+		<li><span class="ls">syslog</span> <span class="lv">yes|no</span> - Logowanie do sysloga. Domyślnie: yes.</li>
+		<li><span class="ls">terminal</span> <span class="lv">yes|no</span> - Domyślnie: yes, po poprawnej inicjalizacji zostaje automatycznie wyłączone.</li>
+		<li><span class="ls">file</span> <span class="lv">plik|no</span> - Logowanie do wskazanego pełną ścieżką pliku. Domyślnie: no.</li>
+	</ul>
+	</li>
+	<li><span class="lm">iptables</span> <span class="ls">{download-hook|upload-hook|imq-autoredirect}</span> - Parametry odnoszące się bezpośrednio do iptables w systemie.</li>
+	<li>
+	<ul>
+		<li><span class="ls">download-hook</span> <span class="lv">PREROUTING|POSTROUTING</span> - Pozwala zmienić łańcuch startowy dla trybu download. Domyślnie: POSTROUTING. Zmiana tego parametru tylko w uzasadnionych przypadkach, ale nie jest zalecana.</li>
+		<li><span class="ls">upload-hook</span> <span class="lv">PREROUTING|POSTROUTING</span> - Pozwala zmienić łańcuch startowy dla trybu upload. Domyślnie: POSTROUTING, w wersjach 1.2pre1 i starszych: PREROUTING. Zmiana tego parametru tylko w uzasadnionych przypadkach, ale nie jest zalecana.</li>
+		<li><span class="ls">target</span> <span class="lv">ACCEPT|RETURN</span> - Ostateczny cel wszystkich utworzonych przez NiceShapera filtrów. Domyślnie: ACCEPT.</li>
+		<li><span class="ls">imq-autoredirect</span> <span class="lv">yes|no</span> - Automatyczne przekierowanie na interfejsy IMQ. Domyślnie: yes.</li>
+	</ul>
+	</li>
+	<li><span class="lm">fallback</span> <span class="lv">{iptables}</span> - W razie problemów z niektórymi mechanizmami, pozwala na awaryjne uruchomienie za pomocą innych mniej zaawansowanych metod.</li>
+	<li>
+	<ul>
+		<li><span class="lv">iptables</span> - Uruchomienie NiceShapera z dużą liczba klas -jeśli generowane są reguły iptables- jest czasochłonne, dlatego od wersji 1.0pre2 używane są programy iptables-save i iptables-restore. Ta opcja pozwala powrócić do wprowadzania filtrów za pomocą programu iptables.</li>
+	</ul>
+	</li>
+	<li><span class="lm">debug</span> <span class="lv">{iptables}</span> - Wyświetla przekazywane do systemu instrukcje.</li>
+	<li>
+	<ul>
+		<li><span class="lv">iptables</span> - Jeśli włączono fallback iptables, wyświetla instrukcje przekazywane iptables. W przeciwnym razie pozostawia do wglądu, plik użyty do utworzenia łańcuchów iptables.</li>
+	</ul>
+	</li>
+</ul>
+</div>	  
+
+<h3>Dyrektywy i parametry sekcji funkcjonalnych:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="lm">section</span> <span class="ls">{speed|shape|htb-burst|htb-cburst}</span> - Ogólne parametry pracy sekcji (zwykle parametry łącza lub przyporządkowanej części).</li>
+	<li>
+	<ul>
+		<li><span class="ls">speed</span> - Wydajność pasma. Jednak stabilnie osiągalna a nie jedynie deklarowana przed ISP.</li>
+		<li><span class="ls">shape</span> - Poziom obciążenia do którego NiceShaper ma dążyć. Zalecana wartość tego parametru to zakres w granicach 90-95%, wartości section speed. W praktyce najlepsze rezultaty dają wartości raczej bliższe zalecanym 90% dla łącz o przepustowości poniżej 1Mbit/s lub bardzo obciążonych a bliższe zalecanym 95% dla łącz o przepustowości kilkunastu i więcej Mbit/s lub słabo obciążonych. Jeśli ten parametr zostanie ustawiony zbyt wysoko, będzie cierpiał ruch interaktywny. Jeśli zbyt nisko, duża część pasma pozostanie niewykorzystana. Częstym błędem jest określanie tu tak wysokiej wartości że obciążenie łącza nigdy jej nie przekracza. Wtedy NiceShaper nie spełnia swej roli, a użytkownicy utrzymują mimo przeciążenia, maksymalne przydziały pasma. Dla NiceShapera sygnałem do "obcinania" klas jest, właśnie, przekroczenie tej wartości przez obciążenie łącza a precyzyjnie przez sumę obciążenia wygenerowanego przez klasy wchodzące w skład sekcji.</li>
+		<li><span class="ls">htb-burst</span> - Burst dla kolejki tworzonej dla sekcji, jako nadrzędna do kolejek klas. Burst zostało szerzej opisane w opisie parametru htb burst klas. Domyślnie wyliczane automatycznie, jednak nie niższe od najwyższego burst klas podległych sekcji, jeśli ustalono.</li>
+		<li><span class="ls">htb-cburst</span> - Jak htb-burst jednak dla ceil.</li>
+	</ul>
+	</li>
+	<li><span class="lm">reload</span> - Częstotliwość uruchamiania sekcji, w sekundach. Wartości w zakresie 1s do 5s są efektywne i jednocześnie nie powodują generowania dużego obciążenia. Na maszynach wyposażonych w wydajny i słabo obciążony procesor, warto zwiększać częstotliwość uruchamiania, co usprawni reagowanie na zmieniające się warunki działania. Dla dużej liczby sekcji lub klas, gdy generowane obciążenie jest zbyt wysokie, rozważyć należy zwiększanie wartości parametru. By pomóc w doborze odpowiedniej wartości, uruchomione sekcje, co godzinę generują i logują, raporty obciążenia. Wartość parametru musi się mieścić w przedziale 0.1s do 60s z krokiem 0.1s. Duże wartości mają coraz mniej wspólnego z dynamicznym podziałem, w praktyce wprowadzając podział statyczny. Używanie wartości przekraczających 5s nie jest zalecane, w takich warunkach NiceShaper nie jest w stanie, sprawnie się dopasowywać, do zachodzących zmian obciążenia.</li>
+	<li><span class="lm">mode</span> <span class="lv">download|upload</span> - Parametr ten konfiguruje, sposób obsługi sekcji w przestrzeni iptables. Dla wszystkich sekcji pracujących w trybie download, tworzony jest wspólny łańcuch o nazwie ns_dwload, do którego przekierowanie, następuje z łańcucha wbudowanego POSTROUTING. Analogicznie dla sekcji typu upload, tworzony jest łańcuch o nazwie ns_upload, domyślnie również z przekierowaniem z łańcucha POSTROUTING (w wersjach 1.2pre1 i starszych był to łańcuch PREROUTING). Ewentualnie dla użytkowników zaawansowanych, zmianę łańcuchów wbudowanych, można osiągnąć za pomocą dyrektywy iptables oraz jej opcji download-hook i upload-hook.</li>
+</ul>	 
+</div>		
+
+W konfiguracji sekcji umieścić można każdą z dyrektyw i parametrów klas (opisanych w dalszej części dokumentacji), stają się one wtedy domyślnymi dla wszystkich klas tej sekcji.
+
+<h2 id="part304">Hosty i klasy NiceShapera</h2>
+
+Plik /etc/niceshaper/class.conf zawiera definicję hostów i/lub klas. Klasy można uznać za odpowiednik lub bardziej rozszerzenie kolejek w HTB. Składniowo klasa zbudowana jest z nagłówka, minimum jednego filtra oraz opcji konfiguracyjnych. Odpowiadająca klasie kolejka w HTB jest tworzona kiedy klasa wykazuje aktywność a wyładowywana po ustalonym czasie bezczynności. Dzięki temu w tym samym czasie w HTB występują kolejki wyłącznie aktywnych klas a nie wszystkich zdefiniowanych, co daje optymalne wartości parametru rate kolejek HTB. Każdy pakiet opuszczający interfejs, zostaje sklasyfikowany za pomocą filtrów, do pierwszej pasującej klasy (faktycznie do kolejki HTB).
+<p>
+Należy zadbać, by zadeklarowane klasy NiceShapera obsługiwały, cały wykorzystujący łącze ruch. W przeciwnym razie pojawią się niemożliwe do kontrolowania przecieki. Np. w przypadku gdy nie wszystkie hosty w sieci lokalnej zostaną przypisane do klas, te niekontrolowane będą odbierały pasmo pozostałym.
+
+<h3>Hosty:</h3>
+
+Klasy są zaawansowanym oraz bardzo elastycznym narzędziem. Jednak to dyrektywa host jest najczęściej wystarczającym i jednocześnie bardzo przyjaznym oraz przejrzystym sposobem, na stworzenie sprawiedliwego podziału łącza dla wszystkich lub większości standardowych użytkowników sieci. Jest to jeden z tych elementów, dzięki którym konfiguracja podziału łącza w NiceShaperze jest tak wygodna. Dyrektywa host umożliwia wygodną konfigurację podziału łącza, nawet bez zapoznawania się z klasami, po prostu spisując listę adresów IP wszystkich hostów obsługiwanych w sieci lokalnej i przydzielając im dowolne nazwy!
+<p>
+Do zdefiniowania hosta potrzebne są: lista sekcji w których ma on być umieszczony wraz z interfejsami na których ma następować kształtowanie ruchu, adres IP oraz nadana nazwa. Host może należeć do dowolnych z uruchomionych sekcji, ale musi należeć przynajmniej do jednej. Sekcje oraz interfejsy kopiowane są wprost z dyrektywy auto-hosts, więc nie ma potrzeby każdorazowego powtarzania tej listy.
+<p>
+Można przyjąć, że dyrektywa host to funkcjonalnie pewnego rodzaju makro NiceShapera. NiceShaper sam zajmie się przetłumaczeniem dyrektywy host na odpowiednie klasy i filtry.
+<p>
+Definicja hosta mieści się zawsze w jednej linii. Składniowo wygląda następująco:
+
+<div class="boxExplain">
+	<span class="lm">host</span> <span class="lv">ip nazwa</span>
+</div>
+
+Przykładowo:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">host</span> <span class="lv">192.168.0.10 pc10</span></li>
+	<li><span class="lm">host</span> <span class="lv">192.168.0.11 pc11</span></li>
+</ul>
+</div>
+
+Powyższe przykładowe definicje hostów zostaną, przez parser konfiguracji, rozłożone na następujące klasy:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+	<li><br></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc11</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.11</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 pc11</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.11</span></li>
+</ul>	 
+</div>
+
+NiceShaper wstawia do filtrów test dstip lub srcip, zależnie od trybu sekcji.
+<p>
+Host wskazywany jest wyłącznie za pomocą adresu IP. Tam gdzie potrzebne są dodatkowe możliwości filtrowania lub nadpisywania parametrów domyślnych, tam wkraczają klasy.
+
+<h3>Budowa klasy:</h3>
+
+W aktualnej wersji NiceShaper udostępnia 4 typy klas. Są to klasa standardowa oraz klasy o specjalnym przeznaczeniu: virtual, wrapper oraz do-not-shape. Przy czym klasy typu virtual opisane zostały w rozdziale "Klasy typu virtual" a ostatnie dwie w rozdziale "Jak traktować ruch z i do routera".
+<p>
+Definicję klasy rozpoczyna nagłówek klasy a kończy nagłówek kolejnej:
+
+<div class="boxExplain">
+	<ul>
+		<li><span class="lm">class</span> <span class="lv">sekcja interfejs nazwa</span> - Nagłówek klasy standardowej. Klasa tego typu funkcjonuje w ramach sekcji do której należy i podlega dynamicznemu podziałowi.</li>
+	</ul>
+	<p>
+
+	Gdzie:
+
+	<ul>
+		<li><span class="lv">sekcja</span> - Sekcja w skład której wchodzi klasa.</li>
+		<li><span class="lv">interfejs</span> - Interfejs wychodzący (egress) na którym realizowane jest kolejkowanie, czyli utworzona zostanie klasa HTB.</li>
+		<li><span class="lv">nazwa</span> - Nazwa klasy, wyświetlana m.in. przez polecenie niceshaper status.</li>
+	</ul>
+</div>
+ 
+Obowiązkowym parametrem ciała klasy jest filtr:
+
+<div class="boxExplain">
+	<span class="lm">match</span> <span class="ls">test</span> <span class="lv">&lt;test&gt;</span> [<span class="ls">test</span> <span class="lv">&lt;test&gt;</span>]
+</div>
+
+Filtry wskazują ruch którym dana klasa będzie zarządzać. Oczywiście mowa tu o ruchu wychodzącym czyli opuszczającym router, interfejsem na którym klasa działa. Jeśli zachodzi taka potrzeba, co opisane zostało już w rozdziale "współpraca z iptables", odpowiednie wpisy tworzone są przez NiceShapera w iptables w łańcuchu sekcji, jak i tworzony jest filtr kernela, za zadanie mający kierowanie ruchu do odpowiedniej kolejki HTB kształtującej pasmo. Naturalnie testy można ze sobą łączyć, by uzyskać bardziej szczegółowe filtry, zaś w skład klasy wchodzić może dowolna liczba filtrów.
+<p>
+Przykładowa najprostsza klasa ma postać:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc55</span><br>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.55</span></li>
+</ul>	 
+</div>
+
+Lub przykłady w zwiniętej postaci (w dalszej części dokumentacji używany jest pierwszy sposób zapisu):
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc55</span>; <span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.55</span></li>
+</ul>
+</div>
+
+<h3>Dyrektywy i parametry klas:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="lm">low</span> - Minimalne przydzielone klasie pasmo. Domyślnie: 8b/s. Dodatkowo jeśli wykorzystanie pasma przez klasę jest niższe od tej wartości, przy ścinaniu klasa nie jest w ogóle brana pod uwagę przez algorytm podziału.</li>
+	<li><span class="lm">ceil</span> - Maksymalne przydzielone klasie pasmo. Domyślnie równe section shape.</li>
+	<li><span class="lm">rate</span> - Stały przydział pasma - wyłączenie klasy z dynamicznego podziału.</li>
+	<li><span class="lm">strict</span> <span class="lv">0 - 100</span> - Jest to kluczowy, służący priorytyzacji klas, parametr algorytmu dynamicznego podziału. Parametr strict wskazuje, za pomocą procenta w przedziale od low do ceil, próg zwiększonej odpowiedzialności klasy za występujące przeciążenie. Domyślna wartość to 70. Dla przykładu: dla low równego 100kB/s i ceil równego 200kB/s, gdy strict wynosi 50, próg zwiększonej odpowiedzialności to poziom 150kB/s, a dla strict równego 70 to 170kB/s. Przeciążenie to stan, gdy obciążenie w sekcji przekracza wartość parametru section shape. Czym niższa jest wartość tego parametru, w stosunku do pozostałych klas, tym bardziej restrykcyjnie traktowana jest dana klasa. Analogicznie, wyższa wartość, to zwiększona pobłażliwość względem danej klasy. Precyzyjniej, wyznaczona odpowiedzialność klasy za przeciążenie, jest funkcją wartości parametru strict i wygenerowanego przez klasę obciążenia. Ta funkcja jest funkcją liniową narastającą, złożoną z kilku prostych. Jeśli wygenerowane obciążenie jest niższe lub równe low, funkcja daje zerowy stopień odpowiedzialności. Z przedziału pomiędzy low a wyznaczoną przez strict wartością, niski. Gdy obciążenie jest równe wyznaczonemu przez strict, występuje dokładnie średni stopień odpowiedzialności. Przy obciążeniu ją przekraczającym, wysoki. Maksymalna odpowiedzialność występuje, przy obciążeniu równym wartości ceil.</li>
+	<li><span class="lm">hold</span> - Czas nieaktywności po którym kolejka HTB klasy zostaje usunięta. Domyślnie: 30s.</li>
+	<li><span class="lm">set-mark</span> - Parametr ma zastosowanie w sytuacji, kiedy włączono za pomocą dyrektywy mark-on-ifaces, markowanie pakietów na interfejsie klasy. Wtedy pozwala ustawić wartość znacznika. Domyślnie każda klasa automatycznie otrzymuje odpowiednią wartość znacznika. Więcej w "Obsługa markowania pakietów".</li>
+	<li><span class="lm">htb</span> <span class="ls">{prio|scheduler|burst|cburst}</span> - Parametry odnoszące się bezpośrednio do skonfigurowanych kolejek HTB.</li>
+	<li>
+	<ul>
+		<li><span class="ls">prio</span> - Priorytet dla kolejki HTB, przyjmuje wartości od 0 do 7, przy czym niższa wartość to wyższy priorytet. Domyślnie: 5.</li>
+		<li><span class="ls">scheduler</span> <span class="lv">sfq|esfq|no</span> - Wybór algorytmu kolejkowania dla kolejki HTB. Domyślnie: sfq.</li>
+		<li><span class="ls">burst</span> - Ustala jak duża porcja danych może zostać wysłana z pełną prędkością interfejsu bez przechodzenia do obsługi ruchu z kolejnej klasy. Może mieć pozytywny wpływ dla klas obsługujących ruch www lub inny o podobnym charakterze. Domyślnie burst jest wyliczane przez algorytm pobrany z pakietu iproute, niestety czasem wartość w ten sposób wyliczana jest zbyt niska (dotyczy to również programu tc), mogąc powodować trudności w wysycaniu pasm o przepustowości kilkudziesięciu megabitów z dużą liczbą pracujących jednocześnie klas. Ten problem najmocniej dotyczy jednak nie samych klas a kolejek tworzonych automatycznie dla wszystkich sekcji, jako nadrzędne dla kolejek klas. W przypadku stwierdzenia problemów z wysycaniem dużych łącz, spróbować można zwiększać wartość burst rozpoczynając od burst i cburst dla kolejek sekcji, patrz section htb-burst i section htb-cburst.</li>
+		<li><span class="ls">cburst</span> - Jak wyżej tylko dla ceil.</li>
+	</ul>
+	</li>
+	<li><span class="lm">sfq</span> <span class="ls">{perturb}</span> - Konfiguracja algorytmu kolejkowania SFQ jeśli zostanie użyty w ramach klasy.</li>
+	<li>
+	<ul>
+		<li><span class="ls">perturb</span> - Parametr perturb dla SFQ. Domyślnie: 10.</li>
+	</ul>
+	</li>
+	<li><span class="lm">esfq</span> <span class="ls">{perturb|hash}</span> - Konfiguracja algorytmu kolejkowania ESFQ jeśli zostanie użyty w ramach klasy.</li>
+	<li>
+	<ul>
+		<li><span class="ls">perturb</span> - Parametr perturb dla ESFQ. Domyślnie: 10</li>
+		<li><span class="ls">hash</span> <span class="lv">classic|src|dst</span> - Hash ESFQ. Domyślnie: classic.</li>
+	</ul>
+	</li>
+</ul>
+</div>
+
+Jak już wspomniano, wszystkie powyższe dyrektywy i parametry mogą zostać użyte w konfiguracji sekcji, by parametrów nie powtarzać dla każdej klasy z osobna. Następnie jeśli zaistnieje potrzeba zróżnicowania ustawień poszczególnych klas, nadpisać wybrane z nich.
+
+<h3>Testy podstawowe:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="ls">proto</span> <span class="lv">tcp|udp|icmp</span> - Protokół.</li>
+	<li><span class="ls">srcip</span> - Adres źródłowy.</li>
+	<li><span class="ls">dstip</span> - Adres docelowy.</li>
+	<li><span class="ls">srcport|sport</span> - Port źródłowy. Wymaga wskazania protokołu tcp lub udp.</li>
+	<li><span class="ls">dstport|dport</span> - Port docelowy. Wymaga wskazania protokołu tcp lub udp.</li>
+	<li><span class="ls">from-local</span> - Ułatwia kontrolę pakietów wysyłanych przez router. Zastępuje srcip a wskazany adres, musi być poprawnie skonfigurowany na jednym z interfejsów routera. W sytuacji kiedy iptables hook sekcji to PREROUTING lub interfejs klasy to interfejs pracujący w trybie upload, zostaje utworzony duplikat filtra bezpośrednio w łańcuchu POSTROUTING z celem w łańcuchu sekcji. Zabieg ten jest niezbędny, by pakiety wychodzące z routera pojawiły się w łańcuchu sekcji.</li>
+	<li><span class="ls">to-local</span> - Umożliwia kontrolę pakietów odbieranych przez router. Działa analogicznie jak from-local z tą różnicą, że zastępuje test dstip a dodatkowe dowiązanie, tworzone jest w łańcuchu PREROUTING, jeśli iptables hook sekcji to POSTROUTING lub interfejs klasy to interfejs pracujący w trybie download.</li>
+	<li><span class="ls">out-iface</span> - Interfejs którym pakiet opuszcza router. Do reguł iptables zostaje dodany podany interfejs, jako interfejs wychodzący. Ma zastosowanie wyłącznie wtedy gdy interfejsem klasy jest interfejs IMQ, wskazując interfejs fizyczny.</li>
+	<li><span class="ls">in-iface</span> - Interfejs którym pakiet wchodzi do routera. Do reguł iptables zostaje dodany podany interfejs, jako interfejs wchodzący. Analogicznie, ma zastosowanie wyłącznie wtedy gdy interfejsem klasy jest interfejs IMQ.</li>
+</ul>
+</div>
+
+<span class="ls">srcip</span> oraz <span class="ls">dstip</span> mogą wskazywać adres ip lub podsieć adresów o zasięgu zdefiniowanym w standardowy sposób przez maskę, zapisaną w formacie bitowym lub kropkowo-dziesiętnym. Maska nie musi być ciągła (np. 255.255.128.255) jednak należy pamiętać że takiej sytuacji nie obsługuje filtr kernela U32 i dla masek nieciągłych trzeba posłużyć się markowaniem pakietów.
+<p>
+Przykładowe filtry:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.77</span> - Pakiety pochodzące z adresu 192.168.0.77.</li>
+	<li><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.0.2.1</span> <span class="ls">srcport</span> <span class="lv">110</span> <span class="ls">dstip</span> <span class="lv">192.168.0.0/29</span> <span class="ls">proto</span> <span class="lv">tcp</span> - Poczta pobierana z 192.0.2.1 do podsieci 192.168.0.0/29.</li>
+</ul>
+</div>
+	  
+<h3>Testy wymagające włączonego markowania na interfejsie:</h3>
+
+Filtr pakietów iptables został zaopatrzony w olbrzymią liczbę filtrów, które nie są niestety możliwe do zrealizowania przy użyciu filtra kernela U32. Dlatego też poniższe filtry wymagają włączenia markowania pakietów za pomocą dyrektywy mark-on-ifaces. Każdy pakiet dopasowany i oznaczony przez automatycznie wprowadzone reguły iptables, może już być bez problemu skierowany do odpowiedniej kolejki HTB a to dzięki filtrowi kernela FW który w efekcie użycia dyrektywy mark-on-ifaces zostaje użyty w miejsce filtra U32.
+<p>
+Uwaga. Niektóre z poniższych filtrów mogą nie działać na okrojonej kompilacji kernela i/lub iptables.
+
+<div class="boxExplain">
+<ul>
+	<li><span class="ls">not-srcip</span> - Adres źródłowy inny niż podany.</li>
+	<li><span class="ls">not-dstip</span> - Adres docelowy inny niż podany.</li>
+	<li><span class="ls">not-srcport|not-sport</span> - Port źródłowy inny niż podany (należy wskazać protokół tcp lub udp).</li>
+	<li><span class="ls">not-dstport|not-dport</span> - Port docelowy inny niż podany (należy wskazać protokół tcp lub udp).</li>
+	<li><span class="ls">length</span> - Długość pakietu w bajtach, np. 500, :500( od 0 do 500), 500: (500 i większe), 128:500 (128 do 500).</li>
+	<li><span class="ls">state</span> <span class="lv">new|established|related|invalid|untracked</span> - Stan pakietu: </li>
+	<li>
+	<ul>
+		<li><span class="lv">new</span> - Pakiet rozpoczyna nowe połączenie.</li>
+		<li><span class="lv">established</span> - Pakiet należy do nawiązanego połączenia.</li>
+		<li><span class="lv">related</span> -  Pakiet rozpoczynający nowe połączenie jednak powiązany z istniejącą konwersacją (np. transfer danych po ftp).</li>
+		<li><span class="lv">invalid</span> - Pakiet nie może zostać rozpoznany.</li>
+		<li><span class="lv">untracked</span> - Pakiet nie należący do śledzonego połączenia.</li>
+	</ul>
+	</li>
+	<li><span class="ls">tos</span> - Wartość pola TOS pakietu.</li>
+	<li><span class="ls">ttl</span> - TTL pakietu równe podanej wartości.</li>
+	<li><span class="ls">ttl-lower</span> - TTL pakietu mniejsze od podanej wartości.</li>
+	<li><span class="ls">ttl-greater</span> - TTL pakietu większe od podanej wartości.</li>
+	<li><span class="ls">mark</span> - Dopasowuje pakiety, oznaczone przez iptables, podaną wartością wirtualnego znacznika. Praktycznie w każdym przypadku znacznik pakietu zostanie zamieniony na inny, przypisany automatycznie każdej klasie, o ile nie zostanie użyta by temu zapobiec, opcja set-mark klasy. Dodatkowo warto wiedzieć, że podana wartość znacznika będzie chroniona, co oznacza, że NiceShaper nie przydzieli jej żadnej innej klasie. </li>	  
+</ul>
+</div>
+  
+<h2 id="part305">Makra pliku klas</h2>
+
+Makra pliku klas mają za zadanie usprawnić tworzenie wielu klas, jeśli te są podobne do siebie. Działając w pętli, powielają dowolny wycinek pliku klas. Makro składa się z nagłówka, treści oraz zamknięcia. Nagłówek to nawias klamrowy zawierający typ oraz parametry pętli. Treść jest poprawną zawartością pliku klas. Treść zaopatrzona jest w znaki $ (dolar), oraz % (procent), w każdej iteracji pętli zastępowane odpowiednimi danymi. Zamknięcie to nawias klamrowy z ukośnikiem wewnątrz, czyli trzy znaki: {/}.
+<p>
+W aktualnej wersji NiceShapera zaimplementowane są 3 typy makr - sequence, foreach-elem, foreach-pair.
+
+<h3>Makro sequence:</h3>
+
+<div class="boxExplain">
+	<span class="lg">{sequence od do} treść {/}</span> - Makro sequence generuje wartości we wskazanym zakresie, rosnąco. Wartości "od" oraz "do" muszą być wartościami liczbowymi, dodatnimi, z przedziału od 0 do 65535. Kolejne wartości wstawiane są w miejsce znaku dolara.
+</div>
+
+Przykład użycia makra sequence:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">{sequence 10 12}</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc$</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lg">{/}</span></li>
+</ul>
+</div>
+
+Makro wygeneruje:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc11</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.11</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc12</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.12</span></li>
+</ul>	 
+</div>
+
+<h3>Makro foreach-elem:</h3>
+
+<div class="boxExplain">
+	<span class="lg">{foreach-elem lista} treść {/}</span> - Makro foreach-elem podstawia kolejne elementy z listy. Lista musi zawierać wartości liczbowe lub tekstowe, oddzielone białymi znakami (spacja, tabulator). Kolejne elementy wstawiane są w miejsce znaku dolara.
+</div>
+
+Przykład użycia makra foreach-elem:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">{foreach-elem 10 12 15}</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc$</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lg">{/}</span></li>
+</ul>
+</div>
+
+Makro wygeneruje:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc12</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.12</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 pc15</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.15</span></li>
+</ul>
+</div>
+
+<h3>Makro foreach-pair:</h3>
+
+<div class="boxExplain">
+	<span class="lg">{foreach-pair lista_par} treść {/}</span> - Makro foreach-pair podstawia kolejne pary elementów z listy. Lista musi zawierać pary wartości liczbowych lub tekstowych. Pary elementów oddzielone są od siebie przecinkami, elementy pary białymi znakami (spacja, tabulator). Pierwszy element pary to klucz, wstawiany jest w miejsce znaku procenta. Drugi element pary wstawiany jest w miejsce znaku dolara.
+</div>
+
+Przykład użycia makra foreach-pair:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">{foreach-pair ksiegowosc1 11, ksiegowosc2 12, handlowy1 21}</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lg">{/}</span></li>
+</ul>
+</div>
+
+Makro wygeneruje:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 ksiegowosc1</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.11</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 ksiegowosc2</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.12</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 handlowy1</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.21</span></li>
+</ul>
+</div>
+
+<h2 id="part306">Obsługa markowania pakietów</h2>
+
+Markowanie pakietów to zabieg przypisania pakietom wirtualnego znacznika, dzięki któremu, np. po wykonaniu zabiegu SNAT-owania (maskarada IP), ciągle możliwe jest rozpoznanie ich nadawców pomimo zmienionych adresów źródłowych. Wartość ta przyporządkowywana jest przez iptables, pamiętana przez kernel Linuksa i rozpoznawana przez filtr kernela typu FW. Filtr kernela FW przyporządkowuje pakiety do kolejek HTB, w przeciwieństwie do filtra U32, nie za pomocą testów na nagłówkach a na podstawie tego wirtualnego znacznika.
+<p>
+Najczęściej markowanie pakietów nie wymaga patchowania iptables ani kernela. Sam NiceShaper zarządza całością całkowicie automatycznie. Jest to mechanizm bardzo łatwy w uruchomieniu, dlatego markowanie pakietów to dobry sposób na obsługę ruchu wychodzące generowanego przez stacje robocze z prywatnymi adresami IP, bez użycia również wygodnych, ale wymagających patchowania tych ważnych składników Systemu Operacyjnego interfejsów IMQ.
+<p>
+Tak więc, jeśli na danym interfejsie poprzez dyrektywę mark-on-ifaces włączone zostanie markowanie pakietów, NiceShaper każdej klasie pracującej na tym interfejsie przyporządkuje niepowtarzalną wartość znacznika a typ filtrów kernela na danym interfejsie, zostanie zamieniony z U32 na FW. Wszystko to odbywa się w pełni automatycznie. Jeśli jednak z jakiegoś powodu zajdzie taka potrzeba, można wskazać oczekiwaną wartość znacznika klasy, służy temu parametr klasy set-mark. Wskazana w ten sposób wartość nie może powtórzyć się w innej klasie.
+<p>
+Iptables a więc i NiceShaper akceptuje wartości znaczników z zakresu od 0 do 4294967295 (wartość 32bitowa), podawane w formie dziesiętnej lub szesnastkowej poprzedzonej znakami 0x.
+
+<h2 id="part307">Obsługa interfejsów IMQ</h2>
+
+NiceShaper obsługuje IMQ, skompilowane w trybie AB (za NATem w PREROUTINGu, przed NATem w POSTROUTINGu).
+<p>
+Od strony konfiguracji NiceShapera, interfejsów IMQ używa się analogicznie jak tych fizycznych. Prawie zapomnieć można o ich wirtualności, z pełną swobodą mieszając klasy pracujące na interfejsach fizycznych oraz IMQ.
+<p>
+Filtry wymagają wskazania interfejsu fizycznego poprzez test out-iface (lub in-iface jeśli wartość iptables hook zmieniono na PREROUTING). 
+<p>
+Przykładowy wycinek pliku class.conf:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul imq0 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span> <span class="ls">out-iface</span> <span class="lv">eth0</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul imq0 pc11</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.11</span> <span class="ls">out-iface</span> <span class="lv">eth0</span></li>
+</ul>
+</div>
+
+NiceShaper automatycznie przekierowuje ruch na interfejsy IMQ a zachowanie to w razie potrzeby, konfigurowalne jest z poziomu dyrektywy globalnej iptables imq-autoredirect. W przypadku wyłączenia automatycznego przekierowania na IMQ -co nie jest zalecane- należy takowe wykonać dla NiceShapera, czyli: iptables ... -j IMQ --todev ...
+
+<h2 id="part308">Wyzwalacze</h2>
+ 
+Wyzwalacze są mechanizmem umożliwiającym automatyczną zmianę wartości niektórych parametrów klasy po zaistnieniu zdefiniowanego zdarzenia.
+W aktualnej wersji NiceShapera zaimplementowane są 2 wyzwalacze - alter oraz quota.
+
+<h3>Sterowane parametry klasy:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="ls">low</span> - Minimalny przydział pasma. Domyślnie: 8b/s</li>
+	<li><span class="ls">ceil</span> - Maksymalny przydział pasma. Domyślnie równe section shape.</li>
+	<li><span class="ls">rate</span> - Stały przydział pasma.</li>
+</ul>
+</div>
+
+<h3>Sterujące parametry wyzwalaczy:</h3>
+
+<div class="boxExplain">
+<ul>
+	<li><span class="lm">alter</span> <span class="ls">{low|ceil|rate} {time-period}</span> - Wyzwalacz alter w określonym przedziale czasu podmienia wartości zdefiniowanych parametrów, np. w celu zwiększenia przydziałów w porze nocnej.</li>
+	<li>
+	<ul>
+		<li><span class="ls">time-period</span> <span class="lv">gg:mm-gg:mm</span> - Określa czas w którym wyzwalacz jest aktywny, np. 22:00-05:00. Domyślnie: no - wyzwalacz wyłączony.</li>
+	</ul>
+	</li>
+	<li><span class="lm">quota</span> <span class="ls">{low|ceil|rate} {day|week|month} [reset-hour] [reset-wday] [reset-mday]</span> - Wyzwalacz quota umożliwia zmianę wybranych parametrów klasy po zliczeniu przez klasę określonej ilości przesłanych danych, 
+np. w celu dalszego ograniczenia pasma. Wyzwalacz ten zaopatrzony jest w 3 liczniki: dzienny, tygodniowy oraz miesięczny, zadziała zawsze gdy jeden lub więcej liczników przekroczy ustalony limit.</li>
+	<li>
+	<ul>
+		<li><span class="ls">day</span> - Limit dzienny przesłanych danych. Wartość minimalna to 1MB, obsługiwane są jednostki MB, GB oraz TB. Domyślnie: no - wyłączony licznik dzienny quoty.</li>
+		<li><span class="ls">week</span> - Limit tygodniowy, analogicznie jak powyżej.</li>
+		<li><span class="ls">month</span> - Limit miesięczny, analogicznie jak powyżej.</li>
+		<li><span class="ls">reset-hour</span> <span class="lv">gg:mm</span> - Czas w którym następuje zresetowanie licznika quoty dziennej i przywrócenie oryginalnych parametrów jeśli zmieniono i liczniki tygodniowy oraz miesięczny nie zostały przekroczone. Domyślnie 00:00.</li>
+		<li><span class="ls">reset-wday</span> <span class="lv">1 do 7</span> - Jak dla quoty dziennej, określa dzień w którym następuje wyzerowanie licznika quoty tygodniowej. 1 to poniedziałek, 2 to wtorek, itd. aż do 7 czyli niedzieli. Reset następuje przy pierwszym przeładowaniu sekcji wskazanego dnia. Domyślnie: 1 czyli poniedziałek.</li>
+		<li><span class="ls">reset-mday</span> <span class="lv">1 do 31</span> - Analogicznie jak dla quoty tygodniowej. Jeśli wartość wykracza poza ostatni dzień miesiąca, np. 31 w miesiącu 30 dniowym, reset następuje ostatniego dnia takiego miesiąca. Domyślnie: 1.</li>
+	</ul>
+	</li>
+</ul>
+</div>
+ 
+Wyzwalacze są dyrektywą klas, najwygodniej zdefiniować je w ramach sekcji, np.:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;dl&gt;</li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">512kB/s</span> <span class="ls">shape</span> <span class="lv">450kB/s</span></li>
+		<li><span class="lm">low</span> <span class="lv">10kB/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">100kB/s</span></li>
+		<li><span class="lm">alter</span> <span class="ls">ceil</span> <span class="lv">200kB/s</span> <span class="ls">time-period</span> <span class="lv">22:00-5:00</span></li>
+		<li><span class="lm">quota</span> <span class="ls">ceil</span> <span class="lv">20kB/s</span> <span class="ls">day</span> <span class="lv">2GB</span> <span class="ls">week</span> <span class="lv">20GB</span> <span class="ls">month</span> <span class="lv">500GB</span></li>
+		<li><span class="lm">...</span></li>  
+	</ul>
+	</li>
+</ul>
+</div>
+
+Wyzwalacz quota ma wyższy priorytet od wyzwalacza alter, więc jeśli dla któregoś parametru sterowanego nastąpią warunki zadziałania w obydwu wyzwalaczach, użyty zostanie parametr z wyzwalacza quota. Wyzwalacze działają wyłącznie dla klas typu standard-class. Wartości liczników wyzwalacza quota pomiędzy uruchomieniami programu przechowywane są w plikach nazwa_sekcji.quota w katalogu /var/lib/niceshaper. Pliki te uaktualniane są w momencie wyłączania NiceShapera oraz w trakcie jego pracy w odstępach 5 minutowych. W przypadku niepowodzenia zapisu tych plików, stan liczników zostanie bezpowrotnie utracony!
+
+<h2 id="part309">Jak traktować ruch z i do routera</h2>
+
+Ruch pobierany i wysyłany przez sam router najczęściej jest pomijalnie mały i nie wymaga kontroli. Jednak w praktyce, router z Linuksem często udostępnia zasoby plikowe w sieci lokalnej (prostszy scenariusz), a nawet pełni dodatkowe role serwera usługowego (trudniejszy scenariusz).
+<p>
+Ze względu na to, że kształtowanie ruchu odbywa się, na interfejsie którym pakiety opuszczają router, kontrola ruchu przychodzącego (zarówno do strony Internetu jak i LANu) jest utrudniona i wymaga wykorzystania interfejsów IMQ.
+<p>
+By praktycznie rozpatrzyć ten temat, najwygodniejsze będzie rozbicie zagadnienia na 4 scenariusze.
+<p>
+We wszystkich przypadkach należy dodać do filtrów odpowiedni test from-local lub to-local. W przypadkach z interfejsami IMQ pojawia się, dodatkowy, wymagany test in-iface. Ewentualnie out-iface dla ruchu wychodzącego. Wymóg użycia tego testu istnieje, by filtry iptables przekierowywały na interfejsy IMQ, pakiety, jeśli są one dopasowane filtrem oraz interfejsem fizycznym - zapewniając rozróżnienie ruchu po stronie WAN od ruchu po stronie LAN.
+<p>
+Należy pamiętać, że najczęściej klasy tego typu powinny znajdować się na samym początku listy klas.
+<p>
+Przypomnijmy, że łącze internetowe podłączone jest do interfejsu eth0, sieć LAN do eth1. Adres publiczny routera to 198.51.100.100, a dodatkowy adres dla usług to 198.51.100.101, adres prywatny to 192.168.0.1, a adresacja sieci lokalnej to 192.168.0.0/24.
+
+<h3>Wymiana ruchu routera z siecią lokalną (nie angażuje pasma łącza):</h3>
+
+<div class="boxPure">
+<ul>
+	<li>1. Router -&gt; Localnet - Router wysyła dane do sieci lokalnej.</li>
+	<li>2. Router &lt;- Localnet - Router odbiera dane z sieci lokalnej.</li>
+</ul>
+</div>
+
+Kontrola pasma pomiędzy routerem a siecią lokalną, wymaga, wyłączenia z ograniczania. Przecież nie należy ograniczać, nie obciążających łącza transmisji po wydajnym LANowym ethernecie. Ba, dużym błędem byłoby zaliczenie ich do klas klientów, jeśli pobieranie zasobów z serwera plików nie obciąża pasma internetowego. Dla scenariuszy 1 i 2 czyli ruchu między routerem a siecią lokalną, należy używać wyłącznie klas typów wrapper lub do-not-shape.
+
+<div class="boxExplain">
+<ul>
+	<li><span class="lm">class-wrapper</span> - Klasa tego typu ma stałą przepustowość i nie należy do żadnej sekcji, dlatego obsługiwany przez nią ruch nie jest brany pod uwagę przez algorytm podziału i nie jest wliczany do obciążenia kontrolowanego łącza. Dla klasy tej należy ustalić przepustowość za pomocą parametru rate. Klasa wrapper jest przydatna, gdy chcemy ograniczyć ruch niewypływający na wykorzystanie kontrolowanego łącza, np. transfer z uruchomionego na routerze serwera plików lub transfer pomiędzy podsieciami lokalnymi, podłączonymi do różnych interfejsów routera, który kontrolujemy by nie dopuścić do przeciążenia zawodnej sieci radiowej.</li>
+	<li><span class="lm">class-do-not-shape</span> - Klasa tego typu w ogóle nie otrzymuje kolejki HTB, skonfigurowane zostają wyłącznie filtry kernela. Dzięki temu ruch klasy tego typu nie jest prawie wcale ograniczany. Klasa typu do-not-shape, podobnie jak wrapper, nie należy do żadnej sekcji i obsługiwany przez nią ruch, jest ignorowany przez algorytm podziału. Klasa ta w zależności od wartości dyrektywy status do-not-shape, może zostać wprowadzona do łańcuchów NiceShapera w iptables, dzięki czemu możliwe jest obserwowanie (w statystykach) wykorzystywanego przez nią pasma. Niestety, włączenie statystyk klas do-not-shape okupione jest potencjalnie wzrostem obciążenia. Klasa wrapper jest bezpieczniejszym i nie generującym znacznego dodatkowego obciążenia rozwiązaniem!</li>
+</ul>
+</div>
+
+Klasy typów wrapper i do-not-shape nie należą do sekcji, dlatego ich nagłówek różni się od nagłówka klasy standardowej:
+
+<div class="boxExplain">
+	<span class="lm">class-wrapper|class-do-not-shape</span> <span class="lv">interfejs nazwa</span>
+</div>
+
+<h3>1. Router -&gt; Localnet - Router wysyła dane do sieci lokalnej:</h3>
+
+Ruch opisywany w tym scenariuszu to, np. lokalny serwer plików samba lub ftp, serwery poczty imap czy pop3 itp.
+<p>
+Opcja klasy typu do-not-shape - transfery są lokalne więc nie tniemy i nie wliczamy do sumarycznego wykorzystania łącza:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class-do-not-shape</span> <span class="lv">eth1 router_to_local</span></li>	
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">198.51.100.101</span> <span class="ls">dstip</span> <span class="lv">192.168.0.0/24</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">192.168.0.1</span> <span class="ls">dstip</span> <span class="lv">192.168.0.0/24</span></li>
+</ul>
+</div>
+
+Opcja klasy typu wrapper - transfery są lokalne, ale w sieci LAN mamy link o niższej wydajności (np. typu WiFi.). Ograniczamy, ale za pomocą statycznie przydzielonego pasma i konsekwentnie bez wliczania tego ruchu do wykorzystania łącza:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class-wrapper</span> <span class="lv">eth1 router_to_local</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">198.51.100.101</span> <span class="ls">dstip</span> <span class="lv">192.168.0.0/24</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">192.168.0.1</span> <span class="ls">dstip</span> <span class="lv">192.168.0.0/24</span></li>
+	<li class="indent"><span class="lm">rate</span> <span class="lv">20Mb/s</span></li>
+</ul>
+</div>
+
+<h3>2. Router &lt;- Localnet - Router odbiera dane z sieci lokalnej:</h3>
+
+Ruch z sieci lokalnej do routera. Np. umieszczanie zasobów na lokalnym serwerze plików, wysyłanie poczty za pomocą lokalnego serwera smtp itp. 
+<p>
+Opcja klasy typu do-not-shape - Na poziomie iptables NiceShaper używa łańcucha POSTROUTING a na poziomie QOS ingress shaping nie jest używany. Stąd nie ma potrzeby tworzenia klasy typu do-not-shape, gdyż ruch opisywany przez ten scenariusz, ze wskazanych powodów, jest domyślnie całkowicie pomijany.
+<p>
+Opcja klasy typu wrapper - jeśli jednak, analogicznie jak w scenariuszu nr. 1,	chcemy użyć klasy typu wrapper, uzyskanie kontroli nad pasmem przychodzącym do routera wymaga użycia interfejsów typu IMQ. 
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class-wrapper</span> <span class="lv">imq1 router_from_local</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">to-local</span> <span class="lv">198.51.100.101</span> <span class="ls">srcip</span> <span class="lv">192.168.0.0/24</span> <span class="ls">in-iface</span> <span class="lv">eth1</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">to-local</span> <span class="lv">192.168.0.1</span> <span class="ls">srcip</span> <span class="lv">192.168.0.0/24</span> <span class="ls">in-iface</span> <span class="lv">eth1</span></li>
+	<li class="indent"><span class="lm">rate</span> <span class="lv">20Mb/s</span></li>
+</ul>
+</div>
+
+<h3>Wymiana ruchu routera z internetem (angażuje pasmo łącza):</h3>
+
+<div class="boxPure">
+<ul>
+	<li>3. Router -&gt; Internet - Router wysyła dane do internetu.</li>
+	<li>4. Router &lt;- Internet - Router odbiera dane z internetu.</li>
+</ul>
+</div>
+
+Serwowanie usług przez router, po stronie WAN, nie powinno być nadużywane. Jeśli jednocześnie używany jest SNAT lokalnych hostów, usługi dostępne od strony internetu powinny być uruchomione na niezależnym od SNAT publicznym adresie IP. Wymóg posiadania przynajmniej 2-ch publicznych adresów IP (niezależny adres dla SNAT i niezależny adres dla usług), jest wymuszona tym, że w łańcuchu PREROUTING tabeli mangle nie ma możliwości odróżnienia ruchu skierowanego do routera od ruchu NATowanego. W łańcuchu INPUT gdzie odróżnienie jest możliwe (upraszczając), nie ma już jednak możliwości przekierowania ruchu na interfejs IMQ a ten jest niezbędny do kontrolowania ruchu przychodzącego.
+
+<h3>3. Router -&gt; Internet - Router wysyła dane do internetu:</h3>
+
+Obsługa, na przykład, uruchomionych na routerze serwerów www czy poczty, wysyłających dane w stronę internetu. 
+<p>
+W poniższym przykładzie, w przeciwieństwie do scenariuszów 1 i 2, utworzono dwie osobne klasy, by odseparować pasma różnych usług.
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 router_www_to_internet</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">198.51.100.101</span> <span class="ls">proto</span> <span class="lv">tcp</span> <span class="ls">srcport</span> <span class="lv">80</span></li>
+	<li class="indent"><span class="lm">ceil</span> <span class="lv">64kB/s</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 router_mx_to_internet</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">from-local</span> <span class="lv">198.51.100.101</span> <span class="ls">proto</span> <span class="lv">tcp</span> <span class="ls">dstport</span> <span class="lv">25</span></li>
+	<li class="indent"><span class="lm">ceil</span> <span class="lv">128kB/s</span></li>  
+</ul>
+</div>
+
+Umieszczenie klas w sekcji pracującej w trybie upload i filtrowanie testem from-local, nie wymagają szerszego komentarza. Parametry te dają pewność, że ruch wysyłany przez router do internetu, będzie właściwie zliczany. 
+
+<h3>4. Router &lt;- Internet - Router odbiera dane z internetu:</h3>
+
+Ruch z internetu do routera, np. witryny www pobierane przez serwer proxy, czy aktualizacje systemu operacyjnego routera mogące zabierać pasmo klientom.
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl imq0 router_from_internet</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">to-local</span> <span class="lv">198.51.100.101</span> <span class="ls">in-iface</span> <span class="lv">eth0</span></li>
+	<li class="indent"><span class="lm">ceil</span> <span class="lv">1Mb/s</span></li>
+</ul>
+</div>
+
+Umieszczenie klasy w sekcji pracującej w trybie download i filtrowanie testem to-local, znów, nie wymaga szerszego komentarza - jest oczywiste.
+<p>
+Domyślnie, dla klas pracujących w trybie download, filtry iptables tworzone są w łańcuchu do którego ruch przekierowywany jest z POSTROUTINGu. Obsługiwany w tym scenariuszu ruch, nigdy się tam nie pojawia. Stąd, użycie testu to-local, powoduje utworzenie dodatkowego filtra w łańcuchu PREROUTING.
+
+<h1 id="part400">Tematy zaawansowane</h1>
+
+<h2 id="part401">Współpraca z iptables</h2>
+
+Jak już zaznaczono, NiceShaper w kilku sytuacjach wymaga programu iptables. Startując, umieszcza swoje reguły w tabeli mangle a usuwa je przy wyjściu. Zaleca się, by jeśli to możliwe, unikać tych sytuacji. Reguły iptables dla dużej liczby klas będą generować dodatkowe obciążenie. Niestety, jeśli choć jedna z klas w sekcji NiceShapera wymaga reguły w iptables, wprowadzone zostaną reguły dla wszystkich klas tej sekcji, nawet jeśli nie będą wykorzystywane. Ale co gorsza, także dla wszystkich klas innych sekcji tego samego trybu, jeśli występują (tryb sekcji konfigurowany jest za pomocą dyrektywy mode i przyjmuje wartość download lub upload).
+<p>
+Precyzyjniej reguły iptables są potrzebne, więc i tworzone, do wykonywania następujących zadań:
+
+<div class="boxPure">
+<ul class="itemize">
+  <li>Operowanie na pakietach: przyznawanie wirtualnych znaczników (markowanie pakietów) i przekierowywanie na interfejsy IMQ. To zadanie nie wymaga odczytywania liczników iptables, więc przekierowywanie na interfejsy IMQ czy markowanie pakietów nie dodają tak dużego obciążenia jak kolejne zadania..</li>
+  <li>Wykrywanie aktywności klas: dotyczy to klas z filtrami typu FW (patrz mark-on-ifaces). Reguły iptables są tutaj niezbędne, gdyż filtr kernela FW w przeciwieństwie do U32, nie posiada własnych liczników. W efekcie nie daje możliwości wykrycia aktywności klasy, przed utworzeniem dla niej kolejki HTB.</li>
+  <li>Zliczanie ruchu klas typów virtual oraz do-not-shape. W przypadku klas do-not-shape tylko jeśli włączono, dyrektywą status do-not-shape yes, opcję wyświetlania ich w statystykach. Klasy tych typów nie otrzymują kolejek w HTB, stąd wykorzystanie liczników iptables jest jedynym sposobem na ich monitoring. Niestety sposób ten generuje dodatkowe obciążenie, szczególnie każdorazowy operacjami dyskowymi, niezbędnymi do wczytania binaria i bibliotek programu iptables.</li>
+</ul>
+</div>
+
+Jeśli kilka sekcji współdzieli jeden łańcuch iptables, wykorzystywany będzie cache zapełniony podczas poprzedniego odczytu. Czas ważności zawartości cache ustalono na 0.1 sekundy, więc odczyt liczników żadnego z łańcuchów nie wystąpi częściej.
+<p>
+NiceShaper aż do wersji 1.0 wykorzystywał reguły w iptables, jako fundamentalny element swojej pracy. Reguły były tworzone zawsze i dla wszystkich zdefiniowanych klas a służyły zarówno do wykrywania aktywności jak i zliczania generowanego przez nie ruchu. Od wersji 1.2pre1, reguły iptables jedynie wspomagają NiceShapera. 
+
+<h2 id="part402">Współpraca z HTB</h2>
+
+Na każdym z kontrolowanych interfejsów, tworzona jest, zaprezentowana na poniższym diagramie struktura elementów QOS. Struktura ta składa się z kolejek HTB, algorytmów kolejkowania i filtrów kernela. Kolejki HTB tworzą drzewiastą hierarchię, przez którą ruch jest propagowany, tak jak przedstawiono.
+<p>
+NiceShaper nie używa programu tc. Komunikuje się, za pomocą protokołu Netlink, bezpośrednio z kernelem Linuksa - kod odpowiedzialny za tą komunikację częściowo bazuje na kodzie iproute. Jest to najwydajniejsza metoda zarządzania obiektami QOS.
+
+<div class="boxPure">
+<center>
+	<img src="../htb.png" alt="HTB Diagram" border="0">
+</center>
+</div>
+
+Na najniższym poziomie przepustowość interfejsu dzielona jest, na kolejki HTB o stałych i równych sobie wartościach parametrów rate i ceil. Te kolejki HTB nie dzielą się niewykorzystaną przepustowością.
+<p>
+Spełniają one trzy role:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Kolejki HTB tworzone dla każdej pracującej na tym interfejsie sekcji.(1)</li>
+	<li>Kolejkę HTB nadrzędna dla klas typu do-not-shape oraz wrapper.(2)</li>
+	<li>Kolejkę awaryjną przejmującą cały niesklasyfikowany przez filtry ruch wychodzący z interfejsu.(3)</li>
+<ul>
+</div>
+
+1) Każda sekcja działająca na interfejsie (liczba sekcji nie jest ograniczona do jednej), otrzymuje kolejkę HTB o przepustowości równej wartości parametru section speed. Kolejka ta zostaje kolejką nadrzędną, dla wszystkich kolejek klas wchodzących w skład tej sekcji. Jedna z kolejek podrzędnych zostaje utworzona automatycznie, jest to tzw. poczekalnia (Waiting Room), Ruch sklasyfikowany za pomocą filtrów kernela trafia w pierwszej kolejności do tej klasy. Następnie przy przeładowaniu tworzona jest kolejka HTB dla odpowiedniej klasy NiceShapera a filtry kernela zostają tak zmodyfikowane by w efekcie ruch trafiał do docelowej kolejki HTB klasy NiceShapera i za jej pomocą był kontrolowany. Po ustalonym parametrem hold czasie nieaktywności, klasa zostaje usunięta a filtry kernela ponownie przekazują ruch do kolejki poczekalni. Dzięki temu mechanizmowi w tym samym czasie w HTB występują kolejki tylko aktywnych klas NiceShapera, co daje optymalne wartości parametru rate kolejek HTB.
+<p>
+2) Kolejka HTB nadrzędna dla klas typu do-not-shape oraz wrapper, jest kolejką mającą swoją rolę gdy na interfejsie działają klasy jednego lub obydwu z tych typów. W przypadku klas do-not-shape tylko w połączeniu z opcją iface do-not-shape-method safe. Jeśli żadna z tych sytuacji nie występuje, ta kolejka HTB w ogóle nie zostaje utworzona. Jej przepustowość jest przepustowością pozostałą po rozdzieleniu przepustowości interfejsu (iface speed), pomiędzy kolejki sekcji oraz kolejkę awaryjną (patrz 3).
+<p>
+3) Kolejka awaryjna przejmuje cały niesklasyfikowany ruch wychodzący z interfejsu. By podział łącza mógł działać poprawnie do tej kolejki nie powinno nigdy nic wpadać. Jeśli ten warunek nie zostaje spełniony, należy odszukać braki w zdefiniowanych klasach i filtrach. Aż do wersji 1.0pre3 cały niesklasyfikowany przez utworzone filtry ruch, zostawał skolejkowany z pełną prędkością interfejsu. Utrudniało to poprawne działanie podziału. Jednak przywrócenie tego sposobu zachowania jest możliwe, umożliwia je odpowiednia opcja dyrektywy iface. W tym przypadku awaryjna kolejka HTB w ogóle nie zostanie utworzona. Od wersji 1.0pre4 niesklasyfikowany ruch próbujący opuścić kontrolowany interfejs musi przejść przez kolejkę awaryjną o bardzo niskiej przepustowości.
+
+<h2 id="part403">Klasy typu virtual</h2>
+
+Kolejnym typem klas NiceShapera to klasa virtual. Nagłówek tej klasy wygląda następująco:
+
+<div class="boxExplain">
+	<span class="lm">class-virtual</span> <span class="lv">sekcja interfejs nazwa</span> - Klasa tego typu wprowadzona zostaje wyłącznie do przestrzeni iptables, w HTB nie istnieje. Klasa virtual nie służy do kontrolowania ruchu, służy do mierzenia i raportowania wykorzystania obserwowanego pasma. Klasa tego typu należy do sekcji, jednak ruch sklasyfikowany do tej klasy jest pomijany przez algorytm dynamicznego podziału, co oznacza, że dopasowane pakiety muszą ostatecznie zostać sklasyfikowane do klasy standardowej.
+</div>	  
+
+Przykładowo:
+
+<div class="boxExample">
+	<ul>
+		<li><span class="lm">class-virtual</span> <span class="lv">dl eth1 pc10-v-http</span></li>
+		<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">proto</span> <span class="lv">tcp</span> <span class="ls">srcport</span> <span class="lv">80</span></li>
+		<li><span class="lm">class-virtual</span> <span class="lv">dl eth1 pc10-v-https</span></li>
+		<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">proto</span> <span class="lv">tcp</span> <span class="ls">srcport</span> <span class="lv">443</span></li>
+		<li><span class="lm">class</span> <span class="lv">dl eth1 pc10</span></li>
+		<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+	</ul>
+</div>
+
+Przykładowy rezultat komendy niceshaper status:
+
+<div class="boxExample">
+	<pre>
+dl                              ceil -      last-ceil (   last-traffic )
+^g70-v-http^                                          (        424kb/s )
+^g70-v-https^                                         (        608kb/s )
+g70                         5000kb/s -       5000kb/s (       1032kb/s )
+	</pre>
+</div>
+
+</body>
+</html>
+

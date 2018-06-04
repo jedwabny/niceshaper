@@ -1,0 +1,54 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamic Traffic Shaper</title>
+	<meta http-equiv="Content-Language" content="en-us">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Install syntax highlighting in popular text editors</h1>
+
+NiceShaper package includes a syntax highlighting files for popular text editors.
+<p>
+Vim and Midnight Commander (mcedit) are supported. However, Vim support is much better, even enables some syntax checking.
+
+<h2>Vim</h2>
+
+Installation of syntax highlighting for root user can be achieved by copying the editors/vim/niceshaper.vim file into the /root/.vim/syntax/ directory. If the /root/.vim/syntax/ directory doesn't exist, it needs to be created manually. Then in order to register a new configuration file type, there is needed to add the following rules into the /root/.vimrc file: 
+
+<div class="boxExample">
+	:syntax on<br>
+	autocmd BufNewFile,BufRead *niceshaper*/*.conf set filetype=niceshaper
+</div>
+
+Thanks to this rules, syntax highlighting is enabled for all of text files with the ".conf" extension, placed within the path that contains the "niceshaper" word.
+
+
+<h2>Midnight Commander - mcedit</h2>
+
+In the case of mcedit, there is disadvantage of syntax highlighting installation for the user, thus shared installation is recommended. Shared installation can be achieved by copying the editors/mc/niceshaper.syntax into the /usr/share/mc/syntax/ directory.
+<p>
+Finally, the Syntax file contained within this directory needs to be appended with the following rules:
+
+<div class="boxExample">
+	file .\*niceshaper.\*\\.conf$ NiceShaper\sconfiguration ^#\sNiceShaper<br>
+	include niceshaper.syntax
+</div>
+
+New rules have to be inserted before the last rules which already exist at the end of the Syntax file. It means before:
+
+<div class="boxExample">
+	file .\* unknown<br>
+	include unknown.syntax
+</div>
+
+Syntax highlighting works for files with the ".conf" extension placed within the path that contains the "niceshaper" word or contains '# NiceShaper' at first line.
+<p>
+Warning! After upgrade of the Midnight Commander package, it could be needed to redo this installation.
+
+</body>
+</html>
+

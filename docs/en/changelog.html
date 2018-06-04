@@ -1,0 +1,280 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamic Traffic Shaper</title>
+	<meta http-equiv="Content-Language" content="en-GB">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+
+<body>
+
+<h1>ChangeLog</h1>
+
+<h2>[NiceShaper 1.2.4 2016-12-26]</h2>
+
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Auto Hosts feature added. Using auto-hosts directive there is no needed to repeat sections and interfaces within each of hosts. More details can be found in example configuration files and documentation.</li>
+	<li>Example configuration files are adjusted to be self documented base to start using NiceShaper, even without reading documentation.</li>
+	<li>Default value of status unit parameter is kb/s instead of kB/s.</li>
+</ul>
+</div>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Status, show, and stop commands work even if errors in global section configuration are found.</li>
+	<li>Fix a bug where the commands status and show with --remote parameter doesn't work if NiceShaper is not running locally.</li>
+	<li>Niceshaper restart command works if NiceShaper is not running.</li>
+	<li>Allow additional dashes within iface directive.</li>
+	<li>Fix a bug where configuration line which is commented out and contains semicolon are effectively used from semicolon to the rest of commented line.</li>
+	<li>A lot of language fixes and updates into the English translation of documentation introduced.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.3 2016-06-03]</h2>
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>In case where kernel is compiled without performance counters support for U32 filters (CONFIG_CLS_U32_PERF) then iptables rules will be used instead, however, kernel reconfiguration is still recommended!</li>
+	<li>Workaround for bug in kernel 3.16 (probably also 3.14 and next several versions) which makes impossible to read last U32 filter on the interface under x86.</li>
+	<li>Fix a bug, where, if there is more than one U32 filter in one class then only first filter was properly checked for activity.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.2 2016-04-10]</h2>
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>The make install command took over the post-install target job, thus the configuration files are copied during main installation.</li>
+	<li>The make install command doesn't enforce owner nor group of installed files anymore.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.1 2016-03-14]</h2>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Fix Typos in documentations.</li>
+	<li>Fix source code problems found by lintian.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.0 2016-03-06]</h2>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Fix a bug, occurring when packet marking is in use, where router's self generated to the internet traffic is undetected although from-local is used in filter.</li>
+	<li>Fix documentation of from-local, to-local, out-iface, and in-iface tests.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc3 2016-02-21]</h2>
+
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>The "user" directive is renamed to "host". It's the fact, that NiceShaper has used "users" concept since the start of project, but it wasn't either proper nor intuitive. It's high time to fix the wrong design of the directive name.</li>
+</ul>
+</div>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Fix crash at startup, in iptables fallback mode, if iptables rules number is lower than 10.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc2 2016-02-18]</h2>
+
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Introduce a recovery mechanism for QoS and Iptables. Recovery starts, within 60 second delay, after bad traffic report from QoS are received or Iptables chain is broken.</li>
+	<li>The niceshaper stats runtime command is renamed to niceshaper status as it's more natural. For backward compatibility, the stats command is kept for now.</li>
+	<li>To be consistent with runtime stats command change, options stats {owner|group|mode|rewrite} are removed, use status {file-owner|file-group|file-mode|file-rewrite} instead.</li>
+	<li>The Systemd service file is added to the package.</li>
+	<li>The make install target is improved and new post-install target, which installs example configuration files, is added.</li>
+	<li>Shared and orphaned special section is running only if needed, it means if wrapper or do-not-shape classes are used.</li>
+	<li>Values range of sequence macro is expanded, to allow generation of TCP/UDP ports. The lowest number is 0 and the highest number is 65535.</li>
+	<li>New iface&lt;dev&gt; mode option, important for wrapper and do-not-shape classes that works alone on the interface.</li>
+	<li>Add iptables target ACCEPT|RETURN directive.</li>
+</ul>
+</div>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Prevent hangs during stopping if executed at the moment of functional section reloading.</li>
+	<li>Change LDFLAGS -lpthread to -pthread to prevent unsuccessful compilation on some distributions.</li>
+	<li>Fix getuid and geteuid check on startup.</li>
+	<li>Fix some unnecessary netlink error messages during unsuccessful start.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc1 2016-01-06]</h2>
+
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Load Balancing tutorial is introduced.</li>
+	<li>Classes of wrapper and do-not-shape types are included in statistics.</li>
+	<li>Review and refresh of "Router's self generated traffic shaping". Among others, requirement of out-iface test is removed, as it's unnecessary in this case anymore.</li>
+	<li>Review and refresh description of using the IMQ interfaces. To ensure proper work, it's better to compile IMQ module in AB mode.</li>
+</ul>
+</div>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>NiceShaper hangs if initialisation fails, but it should stops properly.</li>
+	<li>In iptables filter, if mark test is used, then next filter is regenerated with the new mark value to properly recognize the same NiceShaper filter packets after mark is changed.</li>
+	<li>To-local test uses PREROUTING chain instead of previously used INPUT, because it's impossible to forward packets from INPUT to IMQ interface.</li>
+	<li>To-local test requires IMQ interface, because NiceShaper doesn't use ingress shaping.</li>
+	<li>More threads protections are implemented.</li>
+</ul>
+</div>
+
+Minor changes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>In stats results, the column last-utilize is renamed to last-traffic.</li>
+	<li>Only root user (UID 0) can use NiceShaper, except stats --remote command.</li>
+	<li>Virtual type class doesn't accept IMQ interface, as it would be meaningless.</li>
+	<li>Names of special purpose classes, in statistics,  got some specific chars to be easier identified.</li>
+	<li>Class interface is introduced to iptables filters if useful.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2pre3 2015-09-20]</h2>
+
+Many hours has been spent to improve English version of documentation.
+<p>
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>New directive named 'user' as simplified class replacement for simple configurations. Details in documentation and example class.conf file.</li>
+</ul>
+</div>
+
+Fixes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Improper status was returned after start. It was always zero what confused the starting scripts.</li>
+	<li>Logged and displayed messages are fixed and cleared up.</li>
+	<li>In some cases iptables rules was generated even when not necessary.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2pre2 2015-08-07]</h2>
+
+It's a big release. Main goals were reorganization in iptables usage and supersede forks of NiceShaper process by threads.
+<p>
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Forks architecture replaced by threads.</li>
+	<li>Section filters removed as these were unintuitive. Filters are replaced by global list of controlled networks included in local-subnets directive. In an iptables mangle table the packets outgoing to local subnets are jumped to ns_dwload chain and packets incoming from local subnets are jumped to ns_upload chain.</li>
+	<li>As we see traffic controlled in wrapper and do-not-shape classes types is not accounted in any section. So it was confusing in configuration that these types of classes are included to sections. Directive 'type' is replaced by various kinds of class headers. Headers class-wrapper and class-do-not-shape do not need section field. In summary there are types: class, class-virtual, class-wrapper, and class- do-not-shape.</li>
+	<li>In the purpose of non sectioned classes of types wrapper and do-not-shape there are created special automatic section named "shared-and-orphaned". As these class types haven't got a section the iptables rules are duplicated between download and upload chains.</li>
+	<li>Option set-mark of filter is removed as practically useless. There are in place only set-mark of class and mark of filter. As previous NiceShaper automatically assigns mark values to classes which can be overwrite by set-mark parameter.</li>
+	<li>New runtime command show with parameter --running {config|classes}. This command shows working main configuration, full classes list, internal identifications, internal marks, and classes created from user directive.</li>
+	<li>Maximal value of reload is limited to 60s as higher values are lack of sense. In production environment values above 10s drastically reduce efficient of dynamic traffic shaping.</li>
+</ul>
+</div>
+
+The other modifications in iptables:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>From now iptables chains are not created for one for each section. There are no more than two of them. One shared for all download mode section and one for upload. One is named ns_dwload and second ns_upload.</li>
+	<li>Iptables counters are received only once a time. If two or more section share the same iptables chain these can use filled cache. Cache expire time is 0.1 second.</li>
+	<li>Directive iptables is moved to global section.</li>
+	<li>Directive iptables options are modified as actual list of options looks like: {download-hook|upload-hook|imq-autoredirect}.</li>
+	<li>Option hook-mode is removed.</li>
+	<li>For now upload and download are redirected from POSTROUTING chain. Before upload works in PREROUTING. This change can be reverted in future or configured now thanks to iptables download-hook and upload-hook options.</li>
+	<li>If fallback iptables is not set and debug iptables is set then iptables-restore script won't be removed after start.</li>
+</ul>
+</div>
+
+The other configuration changes:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>In example class.conf there are suggestion about class-do-not-shape for traffic from router to local network.</li>
+	<li>New user directive is also suggested in included class.conf file.</li>
+	<li>Directive debug is moved to global section.</li>
+	<li>Parameter listen and password of stats directive was migrated to a new independent listen directive as parameters address and password.</li>
+	<li>Option imq autoredirect is not configurable anymore from point of section and classes. It's global option iptables imq-autoredirect from now.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2pre1 17.06.2014r.]</h2>
+
+NiceShaper development has been continued. 
+<p>
+Most important changes and new features:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Written from scratch new dynamic algorithm code. It eliminates some reported problems and creates better base for future development.</li>
+	<li>Introduce class file macros. 3 types of macros has been introduced. Macros improve creating a lot of classes if they are similar. Described in documentation in "Macros of a NiceShaper classes file".</li>
+	<li>Finally obsolete fallback iproute has been removed. Code introduced in version 1.0 that controls HTB by netlink instead of tc command works reliably, so developing redundant method is unnecessarily.</li>
+	<li>Introduce build-in HTB class named Waiting Room. Before create HTB class for newly activated NiceShaper class, traffic are temporary classified to this HTB class. Thanks for that traffic generated by newly activated hosts is not suppress.</li>
+	<li>Iptables usage in traffic accounting and class activity detection is minimised. Actual state is described in "Cooperation with iptables".</li>
+</ul>
+</div>
+
+New directives and changes in configuration:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Introduce iface unclassified-method.</li>
+	<li>New option stats do-not-shape. It enabled accounting traffic of do-not-shape classes to show them in stats.</li>
+	<li>Remove iptables target directive.</li>
+	<li>Remove boolean notation true|false|none, proper values are yes and no only.</li>
+</ul>
+</div>
+
+Documentation:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>A lot of fixes in English translation.</li>
+	<li>Significant documentation audit. More new descriptions and explanations./li>
+	<li>Updated and extended HTB diagram.</li>
+</ul>
+</div>
+
+And many more:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Minimal, average and maximal reload time is reported hourly to logs. It is introduced to help adjust value of reload parameter.</li>
+	<li>Better init script for Debian.</li>
+	<li>Fix compiler warnings. Mainly occurred on libnetlink.cc compilation.</li>
+</ul>
+</div>
+
+</body>
+</html>
+

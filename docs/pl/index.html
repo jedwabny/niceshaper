@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamiczny podział łącza</title>
+	<meta http-equiv="Content-Language" content="pl">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h2>Najnowsza wiadomość [2016-06-04]</h2>
+
+Dwa poważne problemy zostały wykryte w wersji stabilnej 1.2.2. Wersja 1.2.3 wprowadza obejścia obydwu.
+<p>
+1. Ubuntu - błędne wykrywanie uszkodzenia struktury HTB przy starcie.
+<p>
+Kernel Ubuntu, oraz kilku innych dystrybucji, kompilowany jest bez opcji CONFIG_CLS_U32_PERF. Stąd, NiceShaper nie może w pełni monitorować aktywności sieciowej. Zalecanym rozwiązaniem jest rekompilacja kernela z włączoną tą opcją.
+<p>
+2. Błąd w kernelu w wersji 3.16 (najprawdopodobniej również 3.14 i kilku następnych), uniemożliwiający odczytanie ostatniego filtra U32 w systemie x86.
+<p>
+W efekcie, NiceShaper uruchomiony na 32bitowym Debianie 8 z domyślnym kernelem, zgłasza uszkodzenie struktury HTB. Sprawdzonym i działającym rozwiązaniem jest instalacja kernela 4.X z backports lub samodzielna kompilacja.
+
+<h2>NiceShaper</h2>
+
+NiceShaper jest programem działającym w środowisku routera z systemem operacyjnym Linux. Pracuje w przestrzeni użytkownika, wykorzystując standardową Linuksową implementację QOS oraz iptables. Domyślnie, wykorzystuje sprawdzony algorytm podziału łącza HTB w roli klas pośrednich (root, inner) oraz terminujących(leaf). Dyscyplina kolejkowania (qdisc) SFQ jest domyślnym algorytmem kolejkowania dołączanym do klas terminujacych. Filtry U32 oraz FW umożliwiają klasyfikowanie pakietów do klas. NiceShaper udostępnia podejście dynamicznego podziału łącza, które, jest efektywniejsze niż tradycyjne dzielenie pasma z przypisanymi, użytkownikom sieci, stałymi przepustościami. NiceShaper stale monitorując ilości danych przepływających przez router, w odpowiedzi na zmieniające się obciążenie i charakterystykę ruchu generowanego przez użytkowników, dynamicznie dostosowuje wartości parametrów rate oraz ceil utworzonych klas HTB do poziomu umożliwiającego możliwie najpełniejsze wykorzystanie łącza.
+<p>
+NiceShape chroni pasma użytkowników, rozsądnie korzystających z przepustowości łącza i dba o to, by utrzymywać wysycenie pasma na skonfigurowanym optymalnym poziomie. Tak więc, w przypadku asymentrycznego dostępu do internetu, dba o to by nie dopuścić do nadmiernego wysycenia pasma uploadu co w efekcie mogło by doprowadzić do zablokowania downloadu (i odwrotnie). Nie dopuszczając do powstawania przeciążeń, gwarantuje również wygodę użytkowania usług interaktywnych.
+<p>
+Ponadto NiceShaper oferuje:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Przejrzysta i intuicyjna konfiguracja wymiernie skraca nakład czasu, wymagany do uruchomienia działającego podziału łącza.</li>
+	<li>Dyrektywa o nazwie "host", będąca uproszczonym zamiennikiem klas, daje odpowiedni dla większości standardowych konfiguracji kompromis pomiędzy prostotą, przejrzystością i elastycznością.</li>
+	<li>Funkcjonalność makr, umożliwiającą automatyczne generowanie (w oparciu o proste pętle) większej liczby podobnych do siebie klas (i każdej innej dyrektywy pliku klas).</li>
+	<li>Wyzwalacze (triggery) automatycznie zmieniające wybrane parametry klas o wskazanych porach dnia (trigger alter) lub po przekroczeniu wskazanej ilości przesłanych danych (trigger quota).</li>
+	<li>Zautomatyzowaną obsługę mechanizmu markowania pakietów oraz interfejsów IMQ, używanych, w celu zapewnienia obsługi kontroli pasm wychodzących, hostów używających prywatnej adresacji IP, maskowanych za pomocą Source NAT.</li>
+	<li>Wygodny, również zdalny, monitoring.</li>
+	<li>A także automatyczny, zgodny z ustalonym interwałem, zapis do wskazanego pliku aktualnych przydziałów klas - chociażby w celu udostępnienia przez serwis www.</li>
+</ul>
+</div>
+
+Oto wykres MRTG prezentujący efekt działania NiceShapera:
+ 
+<div class="boxPure">
+<center>
+	<img src="../mrtg.png" alt="Wykres MRTG" border="0">
+</center>	
+</div>
+  
+Wykres został zarejestrowany w sieci, w której użytkownicy bardzo intensywnie wykorzystują oprogramowanie P2P wymagające, udostępniania zasobów. Jest to zabójcze dla łącz asymetrycznych charakteryzujących się małym pasmem wychodzącym. Na zielono download, upload - niebieska linia, obydwa kierunki przepływu danych praktycznie zawsze w pełni obciążone. Mimo to każdy użytkownik ma zagwarantowane wygodne surfowanie, pracę lub grę online. Konfiguracja statyczna praktycznie wyklucza tak skuteczne wysycenie pasma w obydwu kierunkach, wymuszając dużo wiekszy kompromis pomiędzy stopniem wykorzystania łącza a wygodą użytkowania usług interaktywnych.
+
+<h2>[2016-03-06]</h2>
+
+Po ponad 2 latach prac, udostępniony zostaje NiceShaper w wersji 1.2.0.
+<p>
+Jest to bardzo ważne wydanie. Gałąź 1.2 jest bardzo dojrzała i mocno zmodernizowana względem 1.0. Poza oprogramowaniem, również dokumentacje doczekały się porządnego przeglądu oraz mnóstwa poprawek: językowych i merytorycznych. 
+<p>
+Po informacje odnośnie zmian zachodzących w trakcie całego procesu rozwoju, odsyłam do dokumentu listy zmian a po kompletne i aktualne opisy do dokumentacji. Zaznaczając, że lista zmian nie zawiera wszystkich najdrobniejszych modyfikacji i poprawek.
+<p>
+Na co warto zwrócić szczególną uwagę?:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Przeprojektowano i ponownie zaimplementowano algorytm dynamicznego podziału.</li>
+	<li>Wprowadzono makra plików klas, implementując 3 typy makr, umożliwiających automatyzowanie tworzenia dużej liczby klas.</li>
+       	<li>Ponownie zaimplementowano obsługę hostów (użytkowników) sieci, czyli znanego jeszcze z wersji 0.5 uproszczonego zamiennika klas, tworząc dyrektywę host. Dyrektywa ta może być mieszana razem z klasami a jej przejrzystość i elastyczność jest wreszcie naprawdę zadowalająca.</li>
+	<li>Wprowadzono mechanizm autonaprawy struktury QoS oraz filtrów Iptables. Ma on szczególne znaczenie dla łącz PPPoE, gdzie, w trakcie restartu interfejsu ppp, NiceShaper wyłączał się.</li>
+	<li>Usunięto, nie zawsze intuicyjne, filtry sekcji a w ich miejsce wprowadzono globalną listę sieci lokalnych local-subnets.</li>
+	<li>Ograniczono wykorzystywanie programu iptables w procesie zliczania ruchu i wykrywania aktywności hostów. Dodatkowo łańcuchy iptables nie są już tworzone dla każdej sekcji z osobna. Jeśli zajdzie taka potrzeba, tworzone są maksymalnie dwa zbiorcze: jeden dla wszystkich sekcji i klas specjalnych pracujących w trybie download (o nazwie ns_dwload), drugi dla trybu upload (łańcuch ns_upload).</li>
+	<li>Moduł stats został zastąpiony przez status.</li>
+	<li>Ruch generowany przez klasy specjalne typów wrapper oraz do-not-shape, nie jest wliczany do sekcji. Dlatego dotychczasowe przypisywanie ich do sekcji było mylące, więc teraz te klasy przypisywane do żadnej z sekcji już nie są.</li>
+	<li>Oraz na mnóstwo innych poprawionych wad projektowych, problemów i błędów.</li>
+</ul>
+</div>
+
+<h2>[2013-07-04]</h2>
+
+W odróżnieniu od wersji 0.6 która nigdy nie uzyskała oficjalnie statusu stabilnej, linia 1.0 doczekała się tylko jednego Release Candidate a na dodatek lista poprawek jest niezwykle skromna.
+<p>
+Zatem - zapraszam do pobierania!
+<p>
+To co najważniejsze w nowym NS to wyeliminowanie uruchamiania komendy systemowej tc. NiceShaper rozmawia bezpośrednio z kernelem więc dodawanie/usuwanie/modyfikowanie klas i filtrów HTB jest teraz piekielnie szybkie i tym większy zysk z tej zmiany im więcej operacji wykonywanych w jednym cyklu. Wreszcie usunięte zostało to ciążące od początku istnienia projektu wąskie gardło wydajności.
+wprowadza nową ciekawą funkcjonalność w postaci wyzwalaczy. Pozwalających na wprowadzenie quoty dla klas oraz alternatywnych wartości konfiguracyjnych o określonych porach doby.
+
+</body>
+</html>
+

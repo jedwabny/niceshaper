@@ -1,0 +1,17 @@
+[Unit]
+Description=Dynamic Traffic Shaper
+Documentation=man:niceshaper
+Documentation=file:///usr/share/doc/niceshaper/html
+Documentation=http://niceshaper.jedwabny.net
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/niceshaper.pid
+ExecStart=/usr/local/bin/niceshaper start
+ExecStop=/usr/local/bin/niceshaper stop
+ExecReload=/usr/local/bin/niceshaper restart
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

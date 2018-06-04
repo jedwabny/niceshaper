@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamiczny podział łącza</title>
+	<meta http-equiv="Content-Language" content="pl">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Wprowadzenie do NiceShapera za pomocą przykładów</h1>
+
+<h2>Przykład #1: Wystarczający download, bardzo mały i przeciążony upload.</h2>
+
+W przykładzie dysponujemy asymetrycznym łączem o dużej przepustowości downloadu, niech to będzie 16Mb/s z bardzo wąskim pasmem wychodzącym o przepustowości np. 512kb/s, które przeciążone jest do granic możliwości.
+<p>
+Sprawa konfiguracji downloadu jest tu banalna, przy małej liczbie hostów można nawet rozważyć rezygnację z dynamicznego podziału. Jednak o upload trzeba szczególnie zadbać, gdyż od niego zależało będzie czy użytkownicy będą mogli skutecznie korzystać ze współdzielonego łącza.
+<p>
+Oto pierwsza konfiguracja i poniżej komentarz:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;global&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">run</span> <span class="lv">ul</span></li>
+		<li><span class="lm">mark-on-ifaces</span> <span class="lv">eth0</span></li>
+		<li><span class="lm">local-subnets</span> <span class="lv">192.168.0.0/23</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">500kb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">450kb/s</span></li>
+		<li><span class="lm">low</span> <span class="lv">40kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">reload</span> <span class="lv">2s</span></li>	
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+	</ul>
+	</li>
+</ul>	
+</div>
+
+Sekcja global jest wymagana i tutaj umieszczony w niej parametr run mówi, które ze skonfigurowanych sekcji należy uruchomić. Sekcji funkcyjnych można mieć dowolną liczbę, najczęściej jednak na każde łącze przypadają dwie (kontrola downloadu oraz uploadu).
+<p>
+Pierwszy ważny parametr:
+
+<div class="boxExample">
+	<span class="lm">mark-on-ifaces</span> <span class="lv">eth0</span>
+</div>
+
+Zastępuje on w przestrzeni HTB domyślne filtry typu U32 filtrami typu FW, i ma on wpływ na wszystkie klasy kontrolowane na podanym interfejsie. Jednocześnie do reguł iptables dodawane są cele MARK --set-mark. Wszystkie niezbędne operacje na każdym etapie działania, wykonywane są automatycznie przez NiceShapera.
+<p>
+Filtr typu FW to filtr kernela przyporządkowujący pakiety do klas HTB, na podstawie przypisanego przez reguły iptables wirtualnego znacznika. Wirtualnego, gdyż znacznik ten istnieje wyłącznie w przestrzeni jądra Linuksa i po opuszczeniu przez pakiet routera znacznik ten znika bezpowrotnie. Dzieje się tak dlatego, że znacznik nie jest zapisywany w samym pakiecie lecz w pamięci operacyjnej.
+<p>
+Opcja ta jest niezbędna chociażby wtedy, gdy podsieć używająca adresów prywatnych IPv4 jest maskowana do adresu routera. Pakiety opuszczające interfejs WAN routera, mając zmienione adresy źródłowe, bez tego zabiegu były by już niemożliwe do przyporządkowania do konkretnych klas operujących na adresach źródłowych.
+<p>
+Dyrektywa <span class="lm">local-subnets</span> ma za zadanie wskazać podsieć (lub podsieci) podłączone do routera po stronie interfejsu LAN. Czyli po tej stronie po której mamy szerokie pasmo a za przesył danych nie płacimy.
+<p>
+Tworzymy przykładową sekcje dla uploadu nazwijmy ją <span class="lv">ul</span>, która to nazwa jest całkowicie dowolna gdyż sama w sobie w żaden sposób nie wpływa na działanie sekcji i równie dobrze może się nazywać upload, sekcja_uploadu czy nawet przewrotnie download. Główną rolę odgrywa tu nie nazwa sekcji a dyrektywa <span class="lm">mode</span>.
+<p>
+Dalej określamy realnie osiągalną przepustowość pasma wychodzącego, przyporządkowanego konfigurowanej sekcji oraz poziom na którym oczekujemy utrzymywać jego wykorzystanie.
+
+<div class="boxExample">
+	<span class="lm">section</span> <span class="ls">speed</span> <span class="lv">500kb/s</span> <span class="ls">shape</span> <span class="lv">450kb/s</span>
+</div>
+
+Wartość parametru <span class="ls">shape</span> przy dobrej jakości łączu musi być bezwzględnie o kilka-kilkanaście procent niższa od wartości parametru <span class="ls">speed</span>!!<br> Zbyt wysoka wartość zwiększy ryzyko zwiększenia czasów odpowiedzi na łączu, aż do całkowitego niedziałania podziału w ekstremalnej sytuacji. Parametr speed również warto delikatnie przyciąć by uniknąć powstawania kolejek pakietów na modemie ISP.
+<p>
+Teraz nic nie stoi na przeszkodzie, by również statyczny podział skonfigurować za pomocą NiceShapera.
+<p>
+Oto konfiguracja kolejnej sekcji a poniżej komentarz:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;dl&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">16Mb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">15Mb/s</span></li>
+		<li><span class="lm">rate</span> <span class="lv">4Mb/s</span></li>
+		<li><span class="lm">htb</span> <span class="ls">scheduler</span> <span class="lv">sfq</span></li>
+		<li><span class="lm">reload</span> <span class="lv">4s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+	</ul>
+	</li>
+</ul>
+</div>
+
+Pojawia się tu dyrektywa:
+
+<div class="boxExplain">
+	<span class="lm">htb</span> <span class="ls">scheduler</span> <span class="lv">sfq</span>
+</div>
+
+SFQ jest w NiceShaperze domyślnym typem schedulera dla klas. Ta dyrektywa została tutaj przytoczona, by pokazać, że już w domyślnej konfiguracji użytkownik otrzymuje pewną ochronę przed własnym działaniem.
+<p>
+Co jeśli zdecydujemy się jednak download również kontrolować za pomocą dynamicznego algorytmu NiceShapera? Wystarczy zastąpić parametr <span class="lm">rate</span> parą parametrów <span class="lm">low</span> i <span class="lm">ceil</span>, np:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">low</span> <span class="lv">1Mb/s</span></li>
+	<li><span class="lm">ceil</span> <span class="lv">6Mb/s</span></li>
+</ul>
+</div>
+
+Takie rozwiązanie tak naprawdę nie ma minusów a zabezpiecza łącze w szczycie przed przeciążeniem. Dodatkowo dzięki niemu można użytkownikom bezpiecznie przydzielić większe pasma. NiceShaper jeśli wykryje taką potrzebę, sam zadba o obcięcie użytkowników najbardziej wysysających swoje łącza i nie dopuści do pogorszenia parametrów dostępu, udostępnianego pozostałym.
+
+<h2> Czym jest klasa.</h2>
+
+Teraz nie pozostaje nic innego jak skonfigurować klasy.
+<p>
+Klasę opisać można jako pojemnik na pakiety, przyporządkowywane za pomocą filtrów. Filtry mogą przyporządkowywać pakiety poprzez kryteria którymi są adresy ip hostów, podsieci, porty, wirtualne znaczniki pakietów i inne. W trakcie swojej pracy NiceShaper dba o to, by agresywnie wykorzystujące swoje pasma klasy, możliwie najmniej przeszkadzały sobie wzajemnie oraz pozostałym.
+<p>
+Przykładowe dwie klasy:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 przykladowa1</span></li>
+	<li class="indent"><span class="lm">match</span>  <span class="ls">srcip</span> <span class="lv">212.77.100.101</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 przykladowa2</span></li>
+	<li class="indent"></span> <span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">212.77.100.101</span></li>
+	<li class="indent"></span> <span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+</div>
+
+Czym się one różnią? Do pierwszej klasy zostaną zakwalifikowane pakiety pochodzące z adresu 212.77.100.101 i jednocześnie skierowane na adres 192.168.0.10. Do drugiej wszystkie pakiety pochodzące z adresu 212.77.100.101 lub skierowane na adres 192.168.0.10. Inaczej mówiąc w pierwszym przypadku obydwa testy muszą zostać spełnione jednocześnie a w drugim którykolwiek z nich, gdyż te filtry są od siebie niezależne.
+<p>
+Pamiętać należy że każdy pakiet testowany jest przez filtry w takiej kolejności w jakiej zostały skonfigurowane, stąd kolejność definiowania klas (a precyzyjniej filtrów) ma kluczowe znaczenie.<p>
+
+<h2>Dodajemy kolejne klasy.</h2>
+
+<div class="boxExample">
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 www</span></li>
+	<li>
+	<ul>
+		<li class="indent"><span class="lm">match</span> <span class="ls">srcport</span> <span class="lv">80</span> <span class="ls">proto</span> <span class="lv">tcp</span></li>
+		<li class="indent"><span class="lm">match</span> <span class="ls">srcport</span> <span class="lv">443</span> <span class="ls">proto</span> <span class="lv">tcp</span></li>
+		<li class="indent"><span class="lm">low</span> <span class="lv">4mb/s</span></li>
+		<li class="indent"><span class="lm">ceil</span> <span class="lv">8mb/s</span></li>
+	</ul>
+	</li>
+</ul>
+ 
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul eth1 www</span></li>
+	<li>
+	<ul>
+		<li class="indent"><span class="lm">match</span> <span class="ls">dstport</span> <span class="lv">80</span> <span class="ls">proto</span> <span class="lv">tcp</span></li>
+		<li class="indent"><span class="lm">match</span> <span class="ls">dstport</span> <span class="lv">443</span> <span class="ls">proto</span> <span class="lv">tcp</span></li>
+		<li class="indent"><span class="lm">low</span> <span class="lv">128kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+	
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 Magazyn</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+	
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 Magazyn</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 Serwis</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.11</span></li>
+</ul>
+
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 Serwis</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.11</span></li>
+</ul>
+
+<ul>
+	<li><span class="lm">class</span> <span class="lv">dl eth1 Ksiegowosc</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.12</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.13</span></li>
+</ul>
+
+<ul>
+	<li><span class="lm">class</span> <span class="lv">ul eth0 Ksiegowosc</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.12</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.13</span></li>
+</ul>
+</div>
+
+Utworzyliśmy tu kilka przykładowych klas. Pierwsza klasa o nazwie "www" obsługuje cały ruch www bez podziału na hosty. Dwie kolejne pary (dl z ul) są oczywiste a ostatnie przydzielają dwóm komputerom w tym samym biurze wspólne pasmo. Klasa www otrzymuje zwiększony przydział pasma, nadpisując domyślne wartości skonfigurowane w sekcji dl, do której to klasa ta należy. Po stronie uploadu również wydzielamy ruch www do samodzielnej klasy, by w razie wysycenia przez użytkownika pasma swojej klasy, ruch www ciągle działał temu użytkownikowi sprawnie.
+<p>
+Każda klasa zostaje przyporządkowana wyłącznie jednej sekcji a pozostałe sekcje nie wiedzą o jej istnieniu. Fakt, że klasy zostają ze sobą wymieszane w ramach jednego pliku konfiguracyjnego nie ma żadnego znaczenia, każda z sekcji wczytuje i kontroluje wyłącznie przypisane jej klasy.
+
+</body>
+</html>
+

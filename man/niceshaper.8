@@ -1,0 +1,81 @@
+.\" (C) Copyright 2013-2016 Mariusz Jedwabny <mariusz@jedwabny.net>
+.TH NICESHAPER 8 "March 24, 2016"
+.SH NAME
+.PP
+NiceShaper \- Dynamic Traffic Shaper
+.SH SYNOPSIS
+.PP
+\fBniceshaper\fR {start|stop|restart|status|show} [\fIoptions\fR]
+.PP
+\fBniceshaper\fR start|restart [\fB\-\-confdir\fR \fI/path\fR] [\fB\-\-conffile\fR \fIpath\fR] [\fB\-\-classfile\fR \fIpath\fR] [\fB\-\-no-daemon\fR]
+.br
+\fBniceshaper\fR stop
+.br
+\fBniceshaper\fR status|show [\fB--remote\fR \fIip[:port]\fR \fB--password\fR \fIpassword\fR]
+.br
+\fBniceshaper\fR status [\fB--unit\fR \fIunit\fR] [\fB--watch\fR \fI1-60\fR]
+.br
+\fBniceshaper\fR show \fB--running\fR {\fIconfig\fR|\fIclasses\fR}
+.SH DESCRIPTION
+.PP
+\fBNiceShaper\fR is a program working in a Linux router environment.
+It uses a proven HTB QOS algorithm. It provides dynamic traffic shaping
+which is more effective than traditional, static shaping.
+By constantly monitoring packets flowing through the router
+in response to changing load dynamically adjusts the bandwidth
+of acting classes to a level enabling the fullest possible
+usage of a internet access.
+At the same time does not allow for creation of congestion,
+ensuring complete convenience of interactive services.
+.PP
+\fBNiceShaper\fR protects each class which use reasonable amount of bandwidth
+and takes care of overall download when upload is close to stop up.
+.SH OPTIONS
+.PP
+It's possible to create an quite effective configuration using the example files included in the \fI/etc/niceshaper\fR directory.
+.PP
+The documentation, for more complex needs, is placed in the \fI/usr/share/doc/niceshaper/html\fR directory.
+.PP
+The following runtime options can be used:
+.TP 
+\fB\-\-confdir\fR \fI/path\fR
+Overwrite configuration directory location.
+.TP
+\fB\-\-conffile\fR \fIpath\fR
+Overwrite configuration file path.
+.TP
+\fB\-\-classfile\fR \fIpath\fR
+Overwrite classes file path.
+.TP
+\fB\-\-no-daemon\fR
+Don't move a process into the background.
+.TP
+\fB\-\-unit\fR \fIunit\fR
+Overwrite configured status unit.
+.TP
+\fB\-\-watch\fR \fI1-60\fR
+Monitor status with given in seconds interval.
+.TP
+\fB\-\-running\fR \fI{config|classes}\fR
+Dump running configuration or classes.
+.TP
+\fB\-\-remote\fR \fIip[:port]\fR
+Connect to remote NiceShaper (must be configured with status listen).
+.TP
+\fB\-\-password\fR \fIpassword\fR
+Connect to remote NiceShaper using password (must be configured with status password).
+.SH AUTHOR
+.PP
+Mariusz Jedwabny <mariusz@jedwabny.net>.
+.SH "REPORTING BUGS"
+.PP
+Report bugs to <mariusz@jedwabny.net>.
+.SH SEE ALSO
+.PP
+The full documentation for \fBNiceShaper\fR is maintained as html
+documents included in the package and on the official website.
+.PP
+\fBNiceShaper\fR project website:
+.br
+http://niceshaper.jedwabny.net
+

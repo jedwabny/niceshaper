@@ -1,0 +1,278 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamiczny podział łącza</title>
+	<meta http-equiv="Content-Language" content="pl">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Wstęp</h1>
+
+Na początek niezbędne założenia, odnośnie interfejsów sieciowych oraz podłączonych łącz. Są one takie same jak w dokumentacji, z drugim łączem dołączonym do dodatkowego interfejsu eth2. 
+<p>
+Przypominając i kompletując te informacje. Dysponujemy routerem z trzema interfejsami. Do interfejsu eth0 podłączone jest łącze podstawowe a do eth1 sieć lokalna LAN. Drugie łącze podłączone jest do interfejsu eth2. Adres publiczny po stronie pierwszego łącza to 198.51.100.100/24, adres po stronie drugiego łącza to 203.0.113.100/24 a adres po stronie sieci LAN to 192.168.0.1/24. Adresacja sieci LAN to 192.168.0.0/24.
+<p>
+Obydwa łącza to łącza asymetryczne o przepustowościach odpowiednio 8000kb/s na 500kb/s oraz 10000kb/s na 600kb/s.
+<p>
+Sposobów na wykorzystanie dwóch łączy, czyli Load Balancing, jest wiele. Opisywany scenariusz to "przerzucenie" na drugie łącze ruchu www oraz poczty e-mail. Zarówno www jak i poczta charakteryzują się "sporadycznością" ruchu. Dzięki temu, że ruch ten rzadko generuje długotrwałe i stałe obciążenie (w przeciwieństwie do ruchu p2p), dostępne pasmo bardzo dobrze współdzieli się na znaczną liczbę hostów. Dodatkowo poza wysyceniem downloadu (http, imap i pop3 - pobieranie), postaramy się wykorzystać upload drugiego łącza, wysyłając nim ruch smtp. 
+
+<h1>Routing</h1>
+
+Tworzymy plik wykonywalny, np. /usr/local/sbin/routing.sh, który będzie służył do przeładowywania konfiguracji routingu, markowania pakietów, NATowania oraz uruchomienie NiceShapera.
+
+<div class="boxExample">
+FILEPATH="/usr/local/sbin/routing.sh"<br>
+touch ${FILEPATH}<br>
+chown root:root ${FILEPATH}<br>
+chmod 750 ${FILEPATH}
+</div>
+
+Skrypt ten powinien być uruchamiany automatycznie, w trakcie startu systemu. Najlepiej poprzez dodanie ścieżki do niego do kompletnego skryptu startowego lub po prostu do /etc/rc.local.
+<p>
+Skrypt zapewni, że wszystkie pakiety TCP o porcie docelowym wymienionym w zmiennej isp2_ports_tcp, zostaną oznaczone znacznikiem 0x2. Spowoduje to, w połączeniu z odpowiednią konfiguracją, że pakiety te będą routowane drugim łączem oraz kontrolowane przez odpowiednie sekcje NiceShapera.
+<p>
+Do utworzonego wcześniej pliku wklejamy poniższą zawartość, odpowiednio modyfikując, zmienne zdefiniowane na samym jego początku w części "Konfiguracja".
+
+<div class="boxExample">
+#!/bin/sh
+<p>
+# === Konfiguracja ===
+<p>
+wan1_iface="eth0"<br>
+wan1_net="198.51.100.0/24"<br>
+wan1_ip="198.51.100.100"<br>
+wan1_gw="198.51.100.2"
+<p>
+lan_iface="eth1"<br>
+lan_net="192.168.0.0/24"
+<p>
+wan2_iface="eth2"<br>
+wan2_net="203.0.113.0/24"<br>
+wan2_ip="203.0.113.100"<br>
+wan2_gw="203.0.113.2"
+<p>
+isp2_ports_tcp="80,443,25,465,143,993,110,995"
+<p>
+# === Ustawienia systemu operacyjnego ===
+<p>
+IP=`which ip`<br>
+IPT=`which iptables`<br>
+NS=`which niceshaper`<br>
+ECHO=`which echo`
+<p>
+if [ -z "$IP" ]; then<br>
+		echo "Brak programu ip (iproute)"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$IPT" ]; then<br>
+		echo "Brak programu iptables"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$NS" ]; then<br>
+		echo "Brak programu niceshaper"<br>
+		exit 255<br>
+fi
+<p>
+if [ -z "$ECHO" ]; then<br>
+		echo "Brak programu echo"<br>
+		exit 255<br>
+fi
+<p>
+$ECHO 1 &gt; /proc/sys/net/ipv4/ip_forward<br>
+$ECHO 0 &gt; /proc/sys/net/ipv4/conf/all/rp_filter
+<p>
+# === NiceShaper ===
+<p>
+$ECHO "Zatrzymanie NiceShapera"
+<p>
+$NS stop
+<p>
+# === Routing ===
+<p>
+$ECHO "Routing - Czyszczenie"
+<p>
+$IP route flush table 241 2&gt;/dev/null<br>
+$IP route flush table 242 2&gt;/dev/null<br>
+$IP rule del fwmark 0x1 table 241 2&gt;/dev/null<br>
+$IP rule del fwmark 0x2 table 242 2&gt;/dev/null<br>
+<p>
+$ECHO "Routing - Tabela 241"
+<p>
+$IP route add ${wan1_net} dev ${wan1_iface} table 241 # Routing lokalny <br>
+$IP route add ${wan2_net} dev ${wan2_iface} table 241 # Routing lokalny <br>
+$IP route add ${lan_net} dev ${lan_iface} table 241 # Routing lokalny <br>
+$IP route add default via ${wan1_gw} table 241 # Routing domyślny w tabeli 241 przez łącze nr.1
+<p>
+$ECHO "Routing - Tabela 242"
+<p>
+$IP route add ${wan1_net} dev ${wan1_iface} table 242 # Routing lokalny <br>
+$IP route add ${wan2_net} dev ${wan2_iface} table 242 # Routing lokalny <br>
+$IP route add ${lan_net} dev ${lan_iface} table 242 # Routing lokalny <br>
+$IP route add default via ${wan2_gw} table 242 # Routing domyślny w tabeli 242 przez łącze nr.2
+<p>
+$ECHO "Routing - Rules"
+<p>
+$IP rule add fwmark 0x1 table 241<br>
+$IP rule add fwmark 0x2 table 242
+<p>
+# === Markowanie pakietów ===
+<p>
+$ECHO "Markowanie pakietów - Przygotowanie reguł iptables"
+<p>
+$IPT -t mangle -F PREROUTING 2&gt;/dev/null<br>
+<p>
+$IPT -t mangle -F routemark 2&gt;/dev/null<br>
+$IPT -t mangle -X routemark 2&gt;/dev/null<br>
+$IPT -t mangle -N routemark
+<p>
+$IPT -t mangle -A routemark -i ${wan1_iface} -j MARK --set-mark 0x1<br>
+$IPT -t mangle -A routemark -i ${wan2_iface} -j MARK --set-mark 0x2
+<p>
+$IPT -t mangle -A routemark -i ${lan_iface} -p tcp -m multiport --dports ${isp2_ports_tcp} -j MARK --set-mark 0x2<br>
+<p>
+$IPT -t mangle -A routemark -i ${lan_iface} -m mark ! --mark 0x2 -j MARK --set-mark 0x1
+<p>
+$IPT -t mangle -A routemark -j CONNMARK --save-mark
+<p>
+$IPT -t mangle -A PREROUTING -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark<br>
+$IPT -t mangle -A PREROUTING -m state --state NEW -j routemark
+<p>
+# === NAT ===
+<p>
+$IPT -t nat -F POSTROUTING<br>
+$IPT -t nat -A POSTROUTING -o ${wan1_iface} -s ${lan_net} -j SNAT --to ${wan1_ip}<br>
+$IPT -t nat -A POSTROUTING -o ${wan2_iface} -s ${lan_net} -j SNAT --to ${wan2_ip}
+<p>
+# === NiceShaper ===
+<p>
+$ECHO "Uruchomienie NiceShapera"
+<p>
+$NS start
+<p>
+</div>
+
+<h2>Konfiguracja NiceShapera</h2>
+
+Minimalna zawartość pliku config.conf:
+
+<div class="boxExample">
+<ul>
+	<li><span class="lg">&lt;global&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">run</span> <span class="lv">dl1 ul1 dl2 ul2</span></li>
+		<li><span class="lm">mark-on-ifaces</span> <span class="lv">eth0 eth1 eth2</span></li>
+		<li><span class="lm">local-subnets</span> <span class="lv">192.168.0.0/24</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;dl1&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">8000kb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">7200kb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+		<li><span class="lm">reload</span> <span class="lv">3s</span></li>
+		<li><span class="lm">low</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">4000kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul1&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">500kb/s</span> 
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">450kb/s</span>
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+		<li><span class="lm">reload</span> <span class="lv">1s</span></li>
+		<li><span class="lm">low</span> <span class="lv">64kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;dl2&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">10000kb/s</span></li>
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">9000kb/s</span></li>
+		<li><span class="lm">mode</span> <span class="lv">download</span></li>
+		<li><span class="lm">reload</span> <span class="lv">3s</span></li>
+		<li><span class="lm">low</span> <span class="lv">256kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">5000kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+
+<ul>
+	<li><span class="lg">&lt;ul2&gt;</span></li>
+	<li>
+	<ul>
+		<li><span class="lm">section</span> <span class="ls">speed</span> <span class="lv">600kb/s</span> 
+		<li><span class="lm">section</span> <span class="ls">shape</span> <span class="lv">550kb/s</span>
+		<li><span class="lm">mode</span> <span class="lv">upload</span></li>
+		<li><span class="lm">reload</span> <span class="lv">1s</span></li>
+		<li><span class="lm">low</span> <span class="lv">64kb/s</span></li>
+		<li><span class="lm">ceil</span> <span class="lv">256kb/s</span></li>
+	</ul>
+	</li>
+</ul>
+</div>
+
+W konfiguracji z jednym łączem i NATowaniem, markowanie pakietów uruchomione zostaje na interfejsie obsługującym pakiety wychodzące z sieci. Tutaj już na wszystkich interfejsach. Markowanie pakietów na interfejsie obsługującym download, pozwala w wygodny sposób określić, którym łączem pakiet dotarł do sieci.
+
+<h3>Przykłady klas</h3>
+
+Jak powinien wyglądać zestaw klas dla pojedynczego hosta? Tak jak poniżej:
+
+<div class="boxExample">
+<ul class="example">
+	<li><span class="lm">class</span> <span class="lv">dl1 eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">mark</span> <span class="lv">0x1</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl2 eth1 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.10</span> <span class="ls">mark</span> <span class="lv">0x2</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul1 eth0 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul2 eth2 pc10</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.10</span></li>
+</ul>
+</div>
+
+Pierwsze dwie klasy odpowiadają za download. Filtry klasyfikują pakiety na podstawie adresu docelowego oraz wartości znacznika, który zmienia się w zależności od tego którym łączem pakiet dotarł do sieci.
+<p>
+Ostatnie dwie klasy odpowiadają za upload. Filtry klasyfikują pakiety za pomocą adresu źródłowego oraz interfejsu którym pakiet opuszcza router (interfejs klasy), który zmienia się w zależności od tego, którym łączem pakiet zostaje wyroutowany na zewnątrz sieci.
+<p>
+Podsumowując, jak rozróżnić którym łączem routowany jest pakiet. W przypadku downloadu należy posłużyć się wartością znacznika, gdyż w tym kierunku interfejs wyjściowy nie zmienia się. Inaczej jest w przypadku uploadu, gdzie najwygodniej jest posłużyć się interfejsem wyjściowym, który zmienia się w zależności od łącza którym pakiet opuszcza router a dodatkowo nie jest wymagane zapisywanie kolejnego testu filtra, gdyż ten interfejs jest już określony w ramach klasy.
+<p>
+Teraz już pozostaje zduplikować powyższy zestaw klas dla każdego komputera w sieci lokalnej, oczywiście podmieniając adresy IP. 
+<p>
+By uprościć konfigurację, zmniejszyć objętość i zwiększyć przejrzystość pliku klas, warto posłużyć się makrem foreach-pair (lub innym). Makro to wygeneruje kopie tego zestawu klas dla każdej pary "nazwa-ostatni oktet adresu IP".
+
+<div class="boxExample">
+<ul class="example">
+<li><span class="lg">{foreach-pair pc10 10, pc11 11, pc12 12}</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl1 eth1 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span> <span class="ls">mark</span> <span class="lv">0x1</span></li>
+	<li><span class="lm">class</span> <span class="lv">dl2 eth1 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">dstip</span> <span class="lv">192.168.0.$</span> <span class="ls">mark</span> <span class="lv">0x2</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul1 eth0 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lm">class</span> <span class="lv">ul2 eth2 %</span></li>
+	<li class="indent"><span class="lm">match</span> <span class="ls">srcip</span> <span class="lv">192.168.0.$</span></li>
+	<li><span class="lg">{/}</span></li>
+</ul>
+</div>
+
+</body>
+</html>
+

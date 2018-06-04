@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+#	/etc/rc.d/init.d/niceshaper
+#
+#	Startup script for NiceShaper - Dynamic Traffic Shaper
+#
+#
+# chkconfig: 2345 85 15
+# description: Dynamic Traffic Shaping
+# processname: niceshaper
+# pidfile: /var/run/niceshaper.pid
+
+# Source function library.
+. /etc/init.d/functions
+
+PIDFILE=/var/run/niceshaper.pid
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+RETVAL=0
+
+start() {
+	echo -n "Starting niceshaper: "
+
+	if [ -f $PIDFILE ]; then
+		PID=`cat $PIDFILE`
+		echo niceshaper already running: $PID
+		exit 1;
+	fi
+
+	/usr/local/bin/niceshaper start
+
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		touch /var/lock/subsys/niceshaper
+		success
+	else
+		failure
+	fi
+	echo
+}	
+
+stop() {
+	echo -n "Shutting down niceshaper: "
+
+	/usr/local/bin/niceshaper stop
+
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && success || failure
+	echo
+		rm -f /var/lock/subsys/niceshaper
+}
+
+case "$1" in
+	start)
+	start
+	;;
+	stop)
+	stop
+	;;
+	status)
+	status niceshaper
+	;;
+	restart|reload)
+		stop
+	start
+	;;
+	*)
+	echo "Usage: niceshaper {start|stop|status|reload|restart}"
+	exit 1
+esac
+
+exit $RETVAL
+

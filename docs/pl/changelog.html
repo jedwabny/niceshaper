@@ -1,0 +1,337 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<title>NiceShaper - Dynamiczny podział łącza</title>
+	<meta http-equiv="Content-Language" content="pl">
+	<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+	<meta NAME="Author" CONTENT="Mariusz Jedwabny (mariusz@jedwabny.net)">
+	<link rel="stylesheet" href="../ns.css" type="text/css">
+</head>
+<body>
+
+<h1>Lista zmian</h1>
+
+<h2>[NiceShaper 1.2.4 2016-12-26]</h2>
+
+Ważne zmiany i nowe funkcjonalności:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Dodano funkcjonalność Auto Hosts. Dzięki dyrektywie auto-hosts nie jest już wymagane powtarzanie listy sekcji i interfejsów w każdej dyrektywie host. Szczegóły w przykładowych plikach konfiguracyjnych oraz dokumentacji.</li>
+	<li>Przykładowe pliki konfiguracyjne zostały odświeżone, tak by stać się bazą do szybkiego stworzenia działającej konfiguracji NiceShaper, nawet bez czytania dokumentacji.</li>
+	<li>Domyślna wartość parametru status unit to kb/s, zamiast wcześniejszych kB/s.</li>
+</ul>
+</div>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Komendy: niceshaper status, show i stop działają teraz, również jeśli wykryto błędu w konfiguracji sekcji global.</li>
+	<li>Poprawka błędu który uniemożliwiał zdalne wykonanie komend status oraz show (z parametrem --remote), jeśli NiceShaper nie był uruchomiony lokalnie.</li>
+	<li>Komenda niceshaper restart uruchamia NiceShapera również jeśli nie jest on aktualnie uruchomiony.<li>
+	<li>Dodatkowe myślniki w dyrektywie iface są dozwolone.</li>
+	<li>Zakomentowany fragment konfiguracji, jeśli zawiera średnik, jest od średnika do końca linii ładowany chociaż nie powinien być.</li>
+	<li>Drobne poprawki i porządki w dokumentacji</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.3 2016-05-27]</h2>
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Jeśli wykryto brak opcji performance counters filtrów U32 (CONFIG_CLS_U32_PERF) w uruchomionym kernelu, zamiennie użyte zostaną filtry iptables. Jednak wciąż, mimo wprowadzenia tego mechanizmu, rekonfiguracja kernela jest zalecana!</li>
+	<li>Obejście błędu w kernelu w wersji 3.16 (najprawdopodobniej również 3.14 i kilku następnych), uniemożliwiającego odczytanie ostatniego filtra U32 w systemie x86.</li>
+	<li>Jeśli klasa posiada więcej niż jeden filtr U32, aktywność tylko pierwszego była poprawnie monitorowana.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.2 2016-04-10]</h2>
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Komenda make install przejmuje, zadania wykonywane przez post-install. Przykładowe pliki konfiguracyjne są automatycznie kopiowane, podczas instalacji z pakietu źródłowego.</li>
+	<li>Komenda make install nie wymusza już właściciela ani grupy instalowanych plików.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.1 2016-03-14]</h2>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Poprawki literówek w dokumentacji.</li>
+	<li>Wprowadzono poprawki problemów w kodzie źródłowym, wskazane przez narzędzie Lintian.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2.0 2016-03-06]</h2>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Jeśli używane było markowanie pakietów, ruch generowany i wysyłany przez router w stronę internetu, nie był wykrywany mimo użycia testu from-local.</li>
+	<li>Uaktualnienie dokumentacji testów from-local, to-local, out-iface i in-iface.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc3 2016-02-21]</h2>
+
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Nazwa dyrektywy user została zmieniona na host. Fakt, NiceShaper od zawsze operował na użytkownikach, jednak nie było to ani prawidłowe ani intuicyjne. Najwyższy czas, by na niedługo przed wydaniem wersji 1.2, wyprostować tą błędną decyzję projektową z dalekiej przeszłości.</li>
+</ul>
+</div>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Naprawienie błędu uniemożliwiającego uruchomienie w trybie fallback iptables, jeśli liczba utworzonych reguł była mniejsza od 10.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc2 2016-02-18]</h2>
+
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Wprowadzono mechanizm autonaprawy struktury QoS oraz filtrów Iptables. Ma on szczególne znaczenie dla łącz PPPoE, gdzie w trakcie restartu interfejsu ppp, NiceShaper wyłączał się. Mechanizm uruchamia się z 60 sekundowym opóźnieniem, między innymi, jeśli odebrano niepoprawne dane o ruchu na interfejsie lub wykryto uszkodzenie łańcuchów Iptables NiceShapera.</li>
+	<li>Komenda niceshaper stats została przemianowana na niceshaper status. Dla zapewnienia kompatybilności wstecznej, komenda stats zostaje pozostawiona - jednak bez gwarancji, że w przyszłości nie będzie spełniać innej roli.</li>
+	<li>Dla zachowania spójności, również opcje stats {owner|group|mode|rewrite} zostały przemianowane, na: status {file-owner|file-group|file-mode|file-rewrite}.</li>
+	<li>Plik serwisu Systemd został dodany do pakietu.</li>
+	<li>Opcja kompilacji make install została ulepszona, a dodatkowo wprowadzono opcję make post-install, odpowiedzialną za instalację przykładowych plików konfiguracyjnych.</li>
+	<li>Sekcja specjalna shared-and-orphaned zostaje uruchomiona tylko jeśli jest potrzebna, to znaczy jeśli używane są klasy typów wrapper lub do-not-shape.</li>
+	<li>Zakres wartości makra sequence został rozszerzony do wartości od 0 do 65535, by umożliwić generowanie portów TCP/UDP.</li>
+	<li>Wprowadzono opcję iface&lt;dev&gt; mode, ważną dla klas typów wrapper oraz do-not-shape, jeśli występują samodzielnie na interfejsie (to znaczy, bez towarzystwa klas standardowych).</li>
+	<li>Dodanie opcji iptables target ACCEPT|RETURN.</li>
+</ul>
+</div>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Usunięcie błędu powodującego zawieszanie się procesu wyłączania niceshapera, jeśli komenda stop zostaje wykonana w momencie przeładowywania sekcji.</li>
+	<li>Zmiana flagi kompilatora -lpthread na -pthread, gdyż na niektórych dystrybucjach uniemożliwiała kompilację.</li>
+	<li>Poprawka wykrywania UID oraz EUID użytkownika uruchamiającego NiceShapera.</li>
+	<li>Usunięcie błędów netlinka, raportowanych w trakcie zakończonego niepowodzeniem uruchomienia.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2rc1 2016-01-06]</h2>
+
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Pojawia się nowy, dostosowany do nowej wersji programu, opis Load Balancingu (NiceShaper i 2 łącza).</li>
+	<li>Klasy typów wrapper oraz do-not-shape ponownie wyświetlane są w statystykach.</li>
+	<li>Przegląd i odświeżenie opisu "Jak traktować ruch z i do routera". Między innymi usunięcie wymagania, zbędnego już w tym przypadku, testu out-iface.</li>
+	<li>Przegląd i odświeżenie opisu współpracy z IMQ. Do poprawnej pracy zalecana jest kompilacja modułu IMQ w trybie AB.</li>
+</ul>
+</div>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>NiceShaper zawieszał się, zamiast poprawnie się wyłączyć, jeśli inicjalizacja sekcji kończyła się niepowodzeniem.</li>
+	<li>W filtrach iptables, jeśli występuje test mark, kolejny filtr zostaje ponownie wygenerowany z użyciem nowej wartości znacznika, by umożliwić powrót z łańcucha.</li>
+	<li>Test to-local obsługiwany jest z łańcucha PREROUTING, wcześniej był z INPUT, skąd nie można było wykonać poprawnego przekierowania na IMQ.</li>
+	<li>Test to-local wymaga interfejsu IMQ, gdyż ingress shaping nie jest obsługiwany.</li>
+	<li>Uzupełnienie zabezpieczeń wątków.
+</ul>
+</div>
+
+Inne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>W stats zamieniono nazwę w kolumnie last-utilize na last-traffic.</li>
+	<li>Tylko użytkownik root (UID 0) może używać NiceShapera, z wyjątkiem komendy stats --remote.</li>
+	<li>Klasy typu virtual nie akceptują interfejsów IMQ, gdyż nie mają one w tym przypadku zastosowania.</li>
+	<li>Nazwy klas typów specjalnych są, w statystykach, oznaczane dodatkowym, wyróżniającym znakiem.</li>
+	<li>Interfejs klasy zostaje również wprowadzony do filtrów iptables.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2pre3 2015-09-20]</h2>
+
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Ponownie zaimplementowano obsługę użytkowników sieci, czyli znanego z wersji 0.5 uproszczonego zamiennika klas. Tym razem utworzono dyrektywę user. Dyrektywa ta, może być mieszana razem z klasami a jej przejrzystość i elastyczność jest wreszcie naprawdę zadowalająca. Szczegóły użytkowania zostały oczywiście zawarte w dokumentacji w rozdziale "Użytkownicy sieci i klasy NiceShapera" oraz dołączonym przykładowym pliku class.conf. By nie powodować dezorientacji, usunięto metody włączania plików users starego typu.</li>
+</ul>
+</div>
+
+Usunięte błędy i problemy:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Po starcie zwracany jest poprawny status. Wcześniej, bez względu na rezultat, zawsze zwracane było zero. Co myliło skrypty startowe.</li>
+	<li>Uporządkowanie komunikatów logowanych i wyświetlanych w trakcie startu i wyłączania.</li>
+	<li>W poprzedniej wersji reguły Iptables były generowane bez względu na to czy były potrzebne.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.2pre2 2015-08-07]</h2>
+
+Głównym celem prac nad tym wydaniem, od strony technicznej, była reorganizacja iptables oraz przejście z przetwarzanie wieloprocesowego (forki procesu niceshapera) na wątki. Od strony użytkowej, postawiono na upraszczanie i zwiększanie intuicyjności konfiguracji. Dzięki podjętym działaniom uzyskano bazę programową i składniową która, nie powinna w kolejnych wersjach podlegać znaczącym zmianom.
+<p>
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Całkowicie zrezygnowano z architektury opartej o podprocesy. Teraz proces niceshapera jest jeden a tam gdzie jest to wskazane, wprowadzone zostały wątki. Stopień wykorzystania wątków może zostać w kolejnych wersjach zwiększony.</li>
+	<li>Usunięto mało intuicyjne, przy rozbudowanych konfiguracjach, filtry match sekcji a w ich miejsce wprowadzono globalną listę sieci lokalnych local-subnets. W przestrzeni iptables wszystkie pakiety kierowane do tych podsieci trafiają do łańcucha ns_dwload a pakiety wychodzące z nich do łańcucha ns_upload.</li>
+	<li>Ruch generowany, przez klasy typu wrapper oraz do-not-shape, nie jest wliczany do sekcji. Dlatego dotychczasowe przypisywanie ich do sekcji było mylące, więc teraz przypisywane już nie są. Dodatkowo dla skompaktowania zapisu dyrektywa type została usunięta a w jej miejsce wprowadzono oznaczenie typu klasy w samym jej nagłówku. Wprowadzone oznaczenia to class-wrapper oraz class-do-not-shape. Nagłówki klas tych typów, nie wchodzących już w skład żadnej sekcji, wymagają podania trzech wartości (zamiast czterech): typu klasy, interfejsu oraz nazwy. Nowy nagłówek klas tych 2-ch typów wygląda następująco: class-&lt;typ&gt; interfejs nazwa. Klasa typu virtual (class-virtual) pozostaje klasą działającą w ramach sekcji, więc jej parametry się nie zmieniają.</li>
+	<li>Na potrzeby obsługi klas bez-sekcyjnych (wrapper i do-not-shape), tworzona jest sekcja wbudowana o nazwie "shared-and-orphaned". Z	tego powodu, że te klasy nie należą do żadnej sekcji, filtry w iptables dodawane są jednocześnie do łańcuchów odpowiedzialnych za download jak i upload.</li>
+	<li>Usunięto opcję set-mark filtra. Była ona mało użyteczna a komplikowała opis obsługi markowania. Pozostawiono wyłącznie dyrektywę set-mark klasy oraz mark filtrów, gdzie wartość set-mark klasy nadpisuje wartość mark filtra. Tak jak do tej pory wartość znacznika dla klasy przydzielana jest automatycznie, chyba, że użyto set-mark klasy. W efekcie każda klasa ma zawsze jeden niepowtarzalny znacznik.</li>
+	<li>Dodano, przydatną w rozwiązywaniu problemów z konfiguracją, komendę uruchomieniową niceshaper show z parametrem --running {config|classes}. Komenda ta wyświetla, aktualnie używaną konfigurację programu i klas, dając pogląd, na sposób w jaki parser konfiguracji przetworzył ustawienia. Za jej pomocą można uzyskać informację o tym jakie identyfikatory (id klas, filtrów, markery pakietów ) zostały dodane do klas, czy odczytać konfigurację klas utworzonych przez konwersję pliku users.</li>
+	<li>Maksymalna wartość reload została ograniczona do 60s, większe wartości nie mają po prostu sensu. Realnie, powyżej 10s następuje drastyczna utrata efektywności dynamicznego podziału.</li>
+</ul>
+</div>
+
+Modyfikacja współpracy z iptables:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Łańcuchy iptables nie są już tworzone dla każdej sekcji z osobna. Jeśli zajdzie taka potrzeba, tworzone są maksymalnie dwa zbiorcze: jeden dla wszystkich sekcji pracujących w trybie download (o nazwie ns_dwload), drugi dla uploadu (ns_upload).</li>
+	<li>Liczniki iptables nie są już odczytywane przez każdą z działających sekcji z osobna. Teraz odczyt wykonywany jest przez główny wątek NiceShapera.</li>
+	<li>Jeśli kilka sekcji współdzieli dany łańcuch, wykorzystywany będzie cache zapełniony podczas poprzedniego odczytu. Czas ważności zawartości cache wynosi 0.1 sekundy, więc odczyt żadnego z łańcuchów nie wystąpi częściej.</li>
+	<li>Dyrektywę iptables, ze zmodyfikowanymi opcjami, przeniesiono do sekcji global. Aktualne opcje to: {download-hook|upload-hook|imq-autoredirect}.</li>
+	<li>Zniknęła opcja hook-mode. Choć w razie potrzeby może ona zostać w przyszłości ponownie zaimplementowana.</li>
+	<li>Testowo upload jak i download rezydują teraz w POTROUTINGU. Wcześniej upload był w PREROUTINGU. Ten aspekt może się jeszcze zmienić i oczywiście można go konfigurować za pomocą dyrektywy iptables z opcjami download-hook oraz upload-hook.</li>
+	<li>Dyrektywa debug iptables jeśli nie użyto fallback iptables, pozostawia do wglądu, plik użyty do utworzenia łańcuchów iptables.</li>
+</ul>
+</div>
+
+Inne zmiany w konfiguracji:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>W przykładowych pliku class.conf, zasugerowano klasę class-do-not-shape dla ruchu z routera do sieci lokalnej.</li>
+	<li>Dyrektywa debug przesunięta została do sekcji global.</li>
+	<li>Parametry listen i password dyrektywy stats zostały zmienione na dyrektywę listen z parametrami address i password.</li>
+	<li>imq autoredirect nie jest już konfigurowalne z poziomu klas ani sekcji, jest to teraz globalna flaga iptables imq-autoredirect.</li>
+</ul>
+</div>
+
+UWAGA!<br>
+1. Ze względu na usunięcie filtrów sekcji, mocno zmienia się logika konfiguracji obsługi wielu łącz. Będzie bardziej intuicyjnie, lecz dokumentacja konfiguracji dla wielu ISP nie została jeszcze ukończona.<br>
+2. Klasy typów wrapper i do-not-shape nie pojawiają się w stats. Nowa implementacja pojawi się w jednej z kolejnych wersji.
+
+<h2>[NiceShaper 1.2pre1 17.06.2014r.]</h2>
+
+Prace nad NiceShaperem zostają oficjalnie wznowione. Od początku pojawia się kilka zmian usuwających nieprzyjemne problemy oraz ułatwiających konfigurację.
+<p>
+Najważniejsze zmiany i nowe funkcjonalności:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>W celu wyeliminowania zgłaszanych problemów, praktycznie od zera przepisano algorytm dynamicznego podziału. Położony został duży nacisk na przewidywalność jego pracy, sprawne oddawanie wolnego pasma, zmniejszenie generowanego obciążenia przez zminimalizowanie ilości obliczeń wykonywanych przy przeładowaniu i wykorzystanie znanego od zawsze parametru strict jako środka priorytyzacji klas (aktualny opis zachowania strict umieszczono w dokumentacji).</li>
+	<li>Wprowadzenie makr plików klas. Zaimplementowano 3 typy makr, umożliwiających automatyczne tworzenie dużej liczby klas. Opis w dokumentacji, rozdział "Makra klas".</li>
+	<li>Usunięcie trybu fallback iproute. Kod komunikujący się z kernelem za pomocą protokołu netlink działa niezawodnie, więc nie ma już potrzeby równoczesnego utrzymywania i rozwijania dodatkowej metody konfiguracji HTB przez komendę tc.</li>
+	<li>Wprowadzenie dla każdej sekcji automatycznej kolejki HTB, tzw. poczekalni (Waiting Room), do której klasyfikowany jest ruch klas przed utworzeniem dla nich kolejki HTB. Dzięki temu przed przeładowaniem sekcji, ruch z takich klas nie zostaje nadmiernie ścinany w kolejce awaryjnej lub nie jest poza kontrolą (zależnie od wersji NiceShapera).</li>
+	<li>Ograniczono wykorzystanie programu iptables w procesie zliczania ruchu i wykrywania aktywności hostów. Program iptables pojawia się tylko tam gdzie jest niezbędny i tylko w takim stopniu w jakim jest niezbędny. Szczegółowy opis w dokumentacji w rozdziale "Współpraca z iptables".</li>
+</ul>
+</div>
+
+Dodane opcje:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Dodanie dyrektywy iface unclassified-method. Nie wszyscy zauważyli, że w wersji 1.0pre4 duży nacisk położono na wymuszenie uszczelnienia pliku klas. Powtarzając changelog do tamtego wydania, ruch który nie został sklasyfikowany przez utworzone filtry, zostaje dotkliwie zdławiony. Dyrektywa ta przywraca wcześniejszy sposób traktowania takiego ruchu, jednak trzeba sobie powiedzieć jasno, jej użycie nie powinno mieć miejsca, w interesie podziału jest wychwycenie w konfiguracji wszystkich obsługiwanych hostów.</li>
+	<li>Opcja stats do-not-shape, włączająca zliczanie ruchu klas typu do-not-shape.</li>
+</ul>
+</div>
+
+Zmiany w konfiguracji:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Usunięcie opcji iptables target.</li>
+	<li>Ostatecznie usunięto obsługę notacji true|false|none, poprawne to wyłącznie yes i no.</li>
+</ul>
+</div>
+
+Dokumentacja:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>Wykonano zauważalny przegląd dokumentacji, dodano więcej opisów i wyjaśnień.</li>
+	<li>Uaktualniono i rozszerzono diagram przepływu ruchu przez kolejki HTB.</li>
+</ul>
+</div>
+
+Pozostałe zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>W celu ułatwienia doboru optymalnej wartości parametru reload, co godzinę logowany jest raport czasów minimalnych, średnich i maksymalnych wykonywania przeładowań.</li>
+	<li>Usprawniono initscript dla Debiana.</li>
+	<li>Usunięcie ostrzeżeń kompilatora, zgłaszanych głównie podczas kompilacji libnetlink.cc, ale i kilku innych plików źródłowych.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.0 04.07.2013r.]</h2>
+
+W odróżnieniu od wersji 0.6 która nigdy nie uzyskała oficjalnie statusu stabilnej, linia 1.0 doczekała się tylko jednego Release Candidate a na dodatek lista poprawek jest niezwykle skromna. Zatem - zapraszam do pobierania!
+
+<h2>[NiceShaper 1.0rc1 06.06.2013r.]</h2>
+
+Pierwsze wydanie Release Candidate, brak tu tak znaczących zmian jak w czterech ostatnich wydaniach, celem jest uzyskanie stabilnej wersji 1.0.
+<p>
+Ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>By zapobiec ścinaniu ruchu przy starcie, wprowadzony został mechanizm dwuetapowej inicjalizacji kolejki domyślnej w htb. W pierwszym kroku kolejka ta otrzymuje przepustowość równą sumie prędkości sekcji na interfejsie. Właściwa wartość iface fallback-rate nadawana jest gdy każda z sekcji przeładuje się przynajmniej jednokrotnie.</li>
+	<li>Wprowadzenie poprawnego mnożnika dla jednostek w układzie SI, wzorem iproute kb/s to 1000 a nie 1024 bity na sekundę. Analogicznie dla pozostałych przedrostków.</li>
+</ul>
+</div>
+
+<h2>[NiceShaper 1.0pre4 01.05.2013r.]</h2>
+
+To już ostatnie wydanie pre-release, więc i ostatnie zawierające tak fundamentalne zmiany. Kolejne aż do stabilnego 1.0, będą wydaniami rc zawierającymi wyłącznie poprawki i drobne ulepszenia.<br>
+Tym razem najważniejszą zmianą, jest usunięcie z kontrolowanych interfejsów nadrzędnej dla wszystkich innych, kolejki HTB o przepustowości 1Gb/s. Co niestety w połączeniu z wydaje się błędnym zaniżaniem burst dla klas o przepustowości przewyższającej 100Mb/s, przez algorytmy iproute, powodowało problemy z wysyceniem dużych łącz.<br>
+Nową architekturę najlepiej obrazuje dodany do dokumentacji diagram HTB.<br>
+W skrócie na każdym kontrolowanym interfejsie pojawiają się niezależne kolejki nadrzędne, dla każdej z występujących na nim sekcji, kolejka domyślna o bardzo niskiej przepustowości dla niezakwalifikowanego do klas ruchu oraz kolejka dla klas typu do-not-shape oraz wrapper. Z tym że ta ostatnia, tylko jeśli jest potrzebna. Więcej informacji we wspomnianym diagramie oraz w opisie nowej dyrektywy sekcji globalnej - iface-&lt;iface&gt; {speed|do-not-shape-method|fallback-rate}.
+
+<h2>[NiceShaper 1.0pre3 26.02.2013r.]</h2>
+
+Wprowadzono inicjalizację reguł iptables za pomocą poleceń iptables-save oraz iptables-restore. Dzięki tej zmianie włączenie NiceShapera trwa ułamek sekundy, co szczególnie odczuwalne jest przy dużej liczbie klas.
+
+<h2>[NiceShaper 1.0pre2 9.02.2013r.]</h2>
+
+W tej wersji najważniejszą nowa funkcjonalnością są wyzwalacze (triggery). Wyzwalacze są mechanizmem umożliwiającym, automatyczną zmianę wartości, niektórych parametrów klasy po zaistnieniu określonych zdarzeń.<br> 
+Na początek zaimplementowane zostały 2 wyzwalacze - alter oraz quota.<br>
+Wyzwalacz alter pozwala na zmianę parametrów o określonych porach dnia, umożliwia np. zwiększenie przydzielonego pasma w porze nocnej.<br>
+Wyzwalacz quota kontroluje ilość pobranych danych i generuje reakcję w oparciu o 3 liczniki: dzienny, tygodniowy oraz miesięczny.<br>
+Na potrzeby wyzwalacza quota wymagane jest utworzenie katalogu /var/lib/niceshaper, jest on niezbędny do przechowywania wartości liczników pomiędzy uruchomieniami NiceShapera.
+
+<h2>[NiceShaper 1.0pre1 31.05.2012r.]</h2>
+
+Najważniejsza wprowadzona funkcjonalność, to zastąpienie uruchomień komendy tc bezpośrednią komunikacją z kernelem. Komunikacja odbywa się za pomocą mechanizmu netlink. Dzięki temu zabiegowi czas trwania i obciążenie generowane przez przeliczanie i rekonfigurowanie regułek HTB, to ułamki z dotychczas mierzonych wartości. Co najważniejsze, wraz ze wzrostem liczby klas zysk rośnie. Nakład czasu procesora wraz ze wzrostem liczby operacji, która jest pochodną liczby klas, nie zwielokratnia się.<br>
+Niestety funkcjonalność nie współpracuje z esfq, który ze względu na zamieszanie z patchami, jest problematyczny w obsłudze tą metodą.<br>
+W przypadku problemów, do tradycyjnego wywoływania komendy tc można wrócić, za pomocą dyrektywy sekcji globalnej fallback iproute.
+<p> 
+Inne ważne zmiany:
+
+<div class="boxPure">
+<ul class="itemize">
+	<li>NiceShaper był zbyt liberalny odnośnie akceptowanych zapisów jednostek przepustowości, zostało to uporządkowane. Jednostki przepustowości użyte w konfiguracji są konwertowane na jednolitą notację lub całkowicie odrzucane.</li>
+	<li>Komenda Niceshaper stats komunikuje się z uruchomionym procesem niceshapera za pomocą protokołu TCP/IP. Dzięki temu możliwa jest obsługa parametrów linii poleceń oraz zdalne odczytywanie statystyk.</li>
+</ul>
+</div>
+
+</body>
+</html>
+
